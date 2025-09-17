@@ -1,9 +1,9 @@
 import type { NdArray } from "ndarray";
-import type { CV2, Data } from "../types/type.js";
-import { broadcastTo, fillZero, matToLine, matToList } from "./func.js";
+import type { CV2, Data,DataKeys,DataValues, MatData, NdArrayData } from "../types/type.js";
+import { broadcastTo, fillValue, matToLine, matToList } from "./func.js";
 import ndarray from "ndarray";
 import ops from "ndarray-ops";
-import type { DET_LIMIT_SIDE_LEN, DET_LIMIT_TYPE, SR_IMAGE_SHAPE } from "../types/paddle_types.js";
+import type { DET_LIMIT_SIDE_LEN, DET_LIMIT_TYPE } from "../types/paddle_types.js";
 import type { Mat } from "@techstark/opencv-js";
 
 export type NormalizeImageParams = {
@@ -34,8 +34,11 @@ export class NormalizeImage {
     this.shapedStd = ndarray(this.std.data,this.shape)
   }
 
-  execute(data:Data):Data{
+  execute(data:MatData):MatData{
     const img = data.image;
+    if (!(img instanceof this.cv.Mat)){
+      throw new Error("ToCHWImage: input image is not Mat");
+    }
     const row = img.rows;
     const col = img.cols;
     const channel = img.channels();
@@ -72,22 +75,24 @@ export class NormalizeImage {
   }
 }
 
-export type DetResizeForTestParams = ({
+export type DetResizeForTestParams = (({
   image_shape: [number,number];
   keep_ratio:boolean;
 }|{
   limit_side_len:number;
-  limit_type:DET_LIMIT_TYPE | null;
+  limit_type:'max'|'min'|'resize_long' | null;
 }|{
   resize_long:number | null;
-} | null) &{
+} ) &{
+  cv:CV2
+})|{
   cv:CV2
 };
 
 export class DetResizeForTest {
   resize_type=0;
   keep_ratio=false;
-  limit_type:DET_LIMIT_TYPE='max';
+  limit_type:'max'|'min'|'resize_long'='max';
   limit_side_len:DET_LIMIT_SIDE_LEN=960;
   image_shape:[number,number]|null=null;
   resize_long:number|null=null;
@@ -112,8 +117,11 @@ export class DetResizeForTest {
     }
   }
 
-  execute(data:Data):Data{
+  execute(data:MatData):MatData{
     let img = data.image;
+    if (!(img instanceof this.cv.Mat)){
+      throw new Error("ToCHWImage: input image is not Mat");
+    }
     const imgH = img.rows;
     const imgW = img.cols;
     let ratio_h:number;
@@ -125,27 +133,169 @@ export class DetResizeForTest {
     if (this.resize_type === 0){
       const result = this.resize_image_type0(img);
       img = result.img;
+    
+      ratio_h = result.ratio_h;
+      ratio_w = result.ratio_w;
+    } else if (this.resize_type === 2){
+      const result = this.resize_image_type2(img);
+      img = result.img;
+      ratio_h = result.ratio_h;
+      ratio_w = result.ratio_w;
+    } else {
+      const result = this.resize_image_type1(img);
+      img = result.img;
       ratio_h = result.ratio_h;
       ratio_w = result.ratio_w;
     }
+    data.image = img;
+    data.shape = [imgH,imgW,ratio_h,ratio_w];
+    return data;
   }
 
   image_padding(img:Mat,value=0):Mat{
     const h = img.rows;
     const w = img.cols;
     const c = img.channels();
+    const type = img.type();
     const defaultIm = ndarray(Uint8Array.from(matToLine(img,this.cv).data),[h,w,c]);
-    const im_pad = fillZero(defaultIm, [Math.max(32,h),Math.max(32,w),c]);
+    const im_pad = fillValue(defaultIm, [Math.max(32,h),Math.max(32,w),c],value);
+    const paddedImg = this.cv.matFromArray(Math.max(32,h),Math.max(32,w), type, im_pad.data);
+    return paddedImg;
+  }
 
-    const isSuccess = ops.addseq(im_pad,value);
-    if (!isSuccess){
-      throw new Error("image_padding: failed to pad image");
+  resize_image_type1(img:Mat):{img:Mat,ratio_h:number,ratio_w:number} {
+    if (this.image_shape === null) {
+      throw new Error("DetResizeForTest: image_shape is null");
     }
-    im_pad.data.set()
+    let[ resize_h,resize_w] = this.image_shape;
+    const ori_h = img.rows;
+    const ori_w = img.cols;
 
+    if (this.keep_ratio) {
+      resize_w = ori_w * resize_h / ori_h;
+      const N = Math.ceil(resize_w / 32);
+      resize_w = N * 32;
+    }
+    const ratio_h = resize_h / ori_h;
+    const ratio_w = resize_w / ori_w;
+    const resizedImg = new this.cv.Mat();
+    this.cv.resize(img, resizedImg, new this.cv.Size(Math.trunc(resize_w), Math.trunc(resize_h)));
+    return { img: resizedImg, ratio_h, ratio_w };
   }
 
   resize_image_type0(img:Mat):{img:Mat,ratio_h:number,ratio_w:number} {
-    
+    const h = img.rows;
+    const w = img.cols;
+    let ratio:number;
+    if (this.limit_type === 'max'){
+      if (Math.max(h,w) > this.limit_side_len){
+        if (h > w){
+          ratio = this.limit_side_len / h;
+        }else{
+          ratio = this.limit_side_len / w;
+        }
+      } else {
+        ratio = 1.0;
+      }
+    } else if (this.limit_type === 'min'){
+      if (Math.min(h,w) < this.limit_side_len){
+        if (h < w){
+          ratio = this.limit_side_len / h;
+        }else{
+          ratio = this.limit_side_len / w;
+        }
+      } else {
+        ratio = 1.0;
+      }
+    } else if (this.limit_type === 'resize_long'){
+      ratio = this.limit_side_len / Math.max(h,w);
+    } else {
+      throw new Error("DetResizeForTest: unknown limit_type");
+    }
+    const resize_h_tmp = h*ratio;
+    const resize_w_tmp = w*ratio;
+
+    const resize_h = Math.max(Math.trunc(Math.round(resize_h_tmp/32)*32),32);
+    const resize_w = Math.max(Math.trunc(Math.round(resize_w_tmp/32)*32),32);
+
+    const resized_img = new this.cv.Mat();
+    try {
+      this.cv.resize(img, resized_img, new this.cv.Size(resize_w, resize_h));
+    } catch {
+      throw new Error(`DetResizeForTest: cv.resize failed. resize_w: ${resize_w}, resize_h: ${resize_h}, img.cols: ${img.cols}, img.rows: ${img.rows}, img.type(): ${img.type()}`);
+    }
+    const ratio_h = resize_h / h;
+    const ratio_w = resize_w / w;
+    return { img: resized_img, ratio_h, ratio_w };
+  }
+
+  resize_image_type2(img:Mat):{img:Mat,ratio_h:number,ratio_w:number} {
+    const h = img.rows;
+    const w = img.cols;
+    let ratio:number;
+    if (this.resize_long === null) {
+      throw new Error("DetResizeForTest: resize_long is null");
+    }
+    if (h > w) {
+      ratio = this.resize_long / h;
+    } else {
+      ratio = this.resize_long / w;
+    }
+
+    const resize_h_tmp = Math.trunc(h*ratio)
+    const resize_w_tmp = Math.trunc(w*ratio)
+
+    const max_stride = 128;
+
+    const resize_h = Math.trunc((resize_h_tmp + max_stride - 1) / max_stride) * max_stride;
+    const resize_w = Math.trunc((resize_w_tmp + max_stride - 1) / max_stride) * max_stride;
+    const dst_img = new this.cv.Mat();
+    this.cv.resize(img, dst_img, new this.cv.Size(resize_w, resize_h));
+    const ratio_h = resize_h / h;
+    const ratio_w = resize_w / w;
+    return { img: dst_img, ratio_h, ratio_w };
+  }
+}
+
+export type ToCHWImageParams = {
+  cv:CV2
+}
+
+export class ToCHWImage {
+  cv:CV2;
+  constructor(params:ToCHWImageParams){
+    this.cv = params.cv;
+  }
+  execute(data:Data):NdArrayData{
+    const img = data.image;
+    if (!(img instanceof this.cv.Mat)){
+      throw new Error("ToCHWImage: input image is not Mat");
+    }
+    const imgList = matToLine(img,this.cv);
+    let ndArrayImg:NdArray = ndarray(imgList.data,[img.rows,img.cols,img.channels()]);
+    const transposedImg = ndArrayImg.transpose(2,0,1);
+    img.delete();
+    data.image = transposedImg;
+    return data as NdArrayData;
+  }
+}
+
+export type KeepKeysParams = {
+  keep_keys: DataKeys[];
+}
+
+export class KeepKeys {
+  keep_keys: DataKeys[];
+  constructor(params:KeepKeysParams){
+    this.keep_keys = params.keep_keys;
+  }
+  execute(data:Data): DataValues[] {
+    let data_list: DataValues[] = [];
+    for (const key of this.keep_keys) {
+      if (key in data) {
+        data_list.push(data[key]);
+      }
+    }
+    return data_list
   }
 }
