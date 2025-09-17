@@ -1,0 +1,32 @@
+{
+  "name": "onnx-ocr-js",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --p tsconfig.json",
+    "test": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.8.1",
+  "devDependencies": {
+    "@techstark/opencv-js": "4.11.0-release.1",
+    "@types/ndarray": "^1.0.14",
+    "@types/ndarray-ops": "^1.2.7",
+    "@types/numjs": "^0.16.8",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "exports": {
+    "./models/*": "./models/*"
+  },
+  "dependencies": {
+    "mathjs": "^14.7.0",
+    "ndarray": "^1.0.19",
+    "ndarray-ops": "^1.2.2",
+    "numjs": "^0.16.1"
+  }
+}
