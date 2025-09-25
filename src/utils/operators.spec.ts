@@ -1,6 +1,8 @@
 import { expect ,describe, it, beforeAll} from 'vitest'
 import type cvReadyPromiseType from "@techstark/opencv-js";
-import { NormalizeImage,DetResizeForTest } from "./operators.js";
+import { NormalizeImage,DetResizeForTest,ToCHWImage,KeepKeys } from "./operators.js";
+import type { Data } from '../types/type.js';
+import ndarray from 'ndarray';
 
 let cv: Awaited<typeof cvReadyPromiseType>;
 
@@ -124,4 +126,54 @@ describe("DetResizeForTest",()=>{
     expect(()=>op.execute({ image: "not a Mat", shape:null } as any)).toThrow();
   });
 
+});
+
+describe("ToCHWImage", () => {
+  it("converts Mat image to CHW ndarray", () => {
+    const toCHW = new ToCHWImage({ cv });
+    // 3チャネルの画像を作る (高さ=2, 幅=2)
+    const mat = cv.matFromArray(2, 2, cv.CV_8UC3, [
+      1, 2, 3,   4, 5, 6,
+      7, 8, 9,   10,11,12,
+    ]);
+    const result = toCHW.execute({ image: mat, shape: null });
+    expect(result.image.shape).toEqual([3, 2, 2]); // (C,H,W)
+  });
+
+  it("throws error if input is not Mat", () => {
+    const toCHW = new ToCHWImage({ cv });
+    expect(() => toCHW.execute({ image: "not a Mat", shape: null } as any)).toThrow();
+  });
+});
+
+describe("KeepKeys", () => {
+  it("keeps only specified keys", () => {
+    const array = ndarray(new Float32Array([1, 2, 3, 4]), [1, 3, 1, 1]);
+    const shape = [1, 3, 1, 1] as [number, number, number, number];
+    const data:Data = {
+      image: array,
+      shape,
+    }
+    const keepKeys = new KeepKeys({ keep_keys: ["shape", "image"] });
+    const result = keepKeys.execute(data);
+    expect(result).toEqual([
+      shape,
+      array
+    ]);
+  });
+
+  it("ignores keys not in data", () => {
+    const mat = cv.matFromArray(2, 2, cv.CV_8UC1, [1, 2, 3, 4]);
+    const shape = [1, 1, 2, 2] as [number, number, number, number];
+    const data: Data = {
+      image: mat,
+      shape,
+    };
+
+    const keepKeys = new KeepKeys({ keep_keys: ["shape", "nonexistent"] as any });
+    const result = keepKeys.execute(data);
+
+    expect(result).toEqual([shape]);
+    mat.delete();
+  });
 });

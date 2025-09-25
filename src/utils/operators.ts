@@ -299,3 +299,32 @@ export class KeepKeys {
     return data_list
   }
 }
+
+export type OperatorConfig = {
+  type: 'NormalizeImage';
+  params: NormalizeImageParams;
+} | {
+  type: 'DetResizeForTest';
+  params: DetResizeForTestParams;
+} | {
+  type: 'ToCHWImage';
+  params: ToCHWImageParams;
+} | {
+  type: 'KeepKeys';
+  params: KeepKeysParams;
+};
+
+export function createOperator(config: OperatorConfig) {
+  switch (config.type) {
+    case 'NormalizeImage':
+      return new NormalizeImage(config.params);
+    case 'DetResizeForTest':
+      return new DetResizeForTest(config.params);
+    case 'ToCHWImage':
+      return new ToCHWImage(config.params);
+    case 'KeepKeys':
+      return new KeepKeys(config.params);
+    default:
+      throw new Error(`Unknown operator type`);
+  }
+}

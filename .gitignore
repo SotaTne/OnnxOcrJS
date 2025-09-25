@@ -140,4 +140,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
+.serena/
+
 .DS_Store

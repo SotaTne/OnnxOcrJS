@@ -3,6 +3,8 @@ import type { Box, CV2, Point } from "../types/type.js";
 import type { NdArray } from "ndarray";
 import ndarray from "ndarray";
 import ops from "ndarray-ops";
+import * as clipperLib from "js-angusj-clipper";
+
 
 export function euclideanDistance(point1: Point, point2: Point): number {
   return Math.sqrt(Math.pow(point1[0] - point2[0], 2) + Math.pow(point1[1] - point2[1], 2));
@@ -231,6 +233,17 @@ export function get_minarea_rect_crop(img:Mat, arg_points:Box, cv:CV2):Mat{
   return crop_img;
 }
 
+export function matToNdArray(mat:Mat,cv:CV2,skip_channel = false):NdArray{
+  const buffer = matToArrayBuffer(mat,cv);
+  if(!(buffer instanceof Float32Array || buffer instanceof Int32Array || buffer instanceof Uint8Array || buffer instanceof Int8Array || buffer instanceof Uint16Array || buffer instanceof Int16Array || buffer instanceof Float64Array)){
+    throw new Error("matToNdArray: unsupported Mat type");
+  }
+  if (skip_channel && mat.channels() === 1){
+    return ndarray(buffer, [mat.rows, mat.cols]);
+  }
+  return ndarray(buffer, [mat.rows, mat.cols, mat.channels()]);
+}
+
 
 export function broadcastTo<T extends ndarray.Data>(
   arr: NdArray<T>,
@@ -300,4 +313,145 @@ export function fillValue<T extends ndarray.Data>(arr:NdArray<T>,targetShape: nu
   );
 
   return newArr;
+}
+
+export function pickAndSet<T extends ndarray.Data>(
+  arr: NdArray<T>,
+  set: (view: NdArray<T>) => NdArray<T>,
+  ...args: number[]
+): NdArray<T> {
+  // 配列が空の場合は例外
+  if (arr.shape.length === 0 || arr.shape.some((s) => s === 0)) {
+    throw new Error("Cannot pick from empty array");
+  }
+
+  // インデックスが配列次元数を超える場合は例外
+  if (args.length > arr.shape.length) {
+    throw new Error("Too many indices");
+  }
+
+  // 範囲チェック (-1は全範囲扱い)
+  args.forEach((a, i) => {
+    if (a !== -1 && (a < 0 || a >= arr.shape[i]!)) {
+      throw new Error(`Index ${a} out of range for dimension ${i}`);
+    }
+  });
+
+  const picked = arr.pick(...args);
+
+  // set を呼び出す - 副作用で picked が変更される
+  const updated = set(cloneNdArray(picked));
+
+  // updated が picked と異なる配列の場合のみ、値をコピーバック
+  if (updated !== picked && updated.data !== picked.data) {
+    ops.assign(picked, updated);
+  }
+
+  // 元の配列を返す（pickedの変更は既に反映されている）
+  return arr;
+}
+
+export function clip(
+  dest: NdArray<ndarray.TypedArray | ndarray.GenericArray<number> | number[]>,
+  src: NdArray<ndarray.TypedArray | ndarray.GenericArray<number> | number[]>,
+  min: number,
+  max: number
+): void {
+  if (min > max) {
+    throw new Error(`min (${min}) must be <= max (${max})`);
+  }
+  
+  ops.assign(dest, src);
+  ops.minseq(dest, max);
+  ops.maxseq(dest, min);
+}
+
+export function cloneNdArray<T extends ndarray.Data>(src: NdArray<T>): NdArray<T> {
+  let newData:T;
+  if (Array.isArray(src.data)){
+    newData = src.data.map((item) => Array.isArray(item) ? [...item] : item) as T;
+  } else {
+    newData = new (src.data.constructor as any)(src.data);
+  }
+  return ndarray(newData, src.shape, src.stride, src.offset);
+}
+
+export type NdArrayListData = number[] | NdArrayListData[];
+
+export function ndArrayToList<T extends ndarray.Data>(arr: NdArray<T>): NdArrayListData {
+  // 0次元配列の場合は1要素の配列として扱う
+  if (arr.shape.length === 0) {
+    return [arr.get()];
+  }
+  
+  // 1次元配列の場合
+  if (arr.shape.length === 1) {
+    const list: number[] = [];
+    for (let i = 0; i < arr.shape[0]!; i++) {
+      list.push(arr.get(i));
+    }
+    return list;
+  }
+  // この後テストの追加
+  
+  // 多次元配列の場合
+  const list: NdArrayListData[] = [];
+  for (let i = 0; i < arr.shape[0]!; i++) {
+    const subArr = arr.pick(i);
+    list.push(ndArrayToList(subArr));
+  }
+  return list;
+}
+
+let _clipper = null as clipperLib.ClipperLibWrapper | null;
+
+export async function unclip(box: { x: number; y: number }[], unclipRatio: number):Promise<clipperLib.Paths> {
+  if (_clipper === null) {
+    _clipper = await clipperLib.loadNativeClipperLibInstanceAsync(
+      clipperLib.NativeClipperLibRequestedFormat.WasmWithAsmJsFallback
+    );
+  }
+  const clipper = _clipper
+
+  const area = polygonArea(box);
+  const perimeter = polygonPerimeter(box);
+  const distance = (area * unclipRatio) / perimeter;
+
+  if (Math.abs(distance) < 1e-6) {
+    return [] as clipperLib.Paths; // 明示的に空を返す
+  }
+
+  return clipper.offsetToPaths({
+    delta: distance,
+    offsetInputs: [
+      {
+        data: box,
+        joinType: clipperLib.JoinType.Round,
+        endType: clipperLib.EndType.ClosedPolygon,
+      },
+    ],
+  }) ?? [];
+}
+
+// 補助関数（Pythonのpoly.area, poly.length相当）
+export function polygonArea(points: { x: number; y: number }[]): number {
+  let area = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const { x: x0, y: y0 } = points[i]!;
+    const { x: x1, y: y1 } = points[(i + 1) % n]!;
+    area += x0 * y1 - x1 * y0;
+  }
+  return Math.abs(area) / 2;
+}
+
+export function polygonPerimeter(points: { x: number; y: number }[]): number {
+  let perimeter = 0;
+  const n = points.length;
+  for (let i = 0; i < n; i++) {
+    const { x: x0, y: y0 } = points[i]!;
+    const { x: x1, y: y1 } = points[(i + 1) % n]!;
+    perimeter += Math.hypot(x1 - x0, y1 - y0);
+  }
+  return perimeter;
 }

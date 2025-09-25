@@ -16,3 +16,8 @@ export type NdArrayData = {
   image:NdArray;
   shape: [number, number, number, number] | null;
 }
+
+export type BufferType = {
+  size: 8 | 16 | 32 | 64;
+  type: 'int' | 'uint' | 'float';
+}
