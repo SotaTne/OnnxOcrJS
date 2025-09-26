@@ -2,17 +2,16 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "composite": true,          // プロジェクト参照を有効にする場合
-    "rootDir": ".",             // ルートに設定ファイルがあるので src に縛らない
-    "noEmit": true,              // 出力は不要（設定ファイルだから）
+    "composite": true, // プロジェクト参照を有効にする場合
+    "rootDir": ".", // ルートに設定ファイルがあるので src に縛らない
+    "noEmit": true, // 出力は不要（設定ファイルだから）
     "esModuleInterop": true,
     "types": ["node"]
-
   },
 
   "include": [
-    "vitest.config.ts",
-    "test",        // テストディレクトリを含めたい場合
+    "vitest.*.ts",
+    "test", // テストディレクトリを含めたい場合
     "src/**/*.spec.ts",
     "src/**/*.test.ts"
   ]

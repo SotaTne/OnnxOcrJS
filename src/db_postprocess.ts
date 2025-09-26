@@ -103,7 +103,7 @@ export class DBPostProcess {
     }
 
     const boxes_batch: {
-      points: NdArray;
+      points: NdArray | number[][][];
     }[] = [];
     for (let batch_index = 0; batch_index < pred.shape[0]; batch_index++) {
       const [src_h, src_w, ratio_h, ratio_w] = shape_list[batch_index]!;
@@ -126,7 +126,7 @@ export class DBPostProcess {
       } else {
         matSegment.copyTo(maskSegment);
       }
-      let boxes: NdArrayListData[] | NdArray;
+      let boxes: Point[][] | NdArray;
       let score: number[];
       if (this.box_type === "poly") {
         [boxes, score] = await this.polygons_from_bitmap(
@@ -155,12 +155,12 @@ export class DBPostProcess {
     _bitmap: Mat,
     dest_width: number,
     dest_height: number
-  ): Promise<[NdArray, number[]]> {
+  ): Promise<[Point[][], number[]]> {
     const bitmap = _bitmap;
     const height = bitmap.rows;
     const width = bitmap.cols;
 
-    const boxes = [];
+    const boxes: Point[][] = [];
     const scores = [];
     const result = matToLine(bitmap, this.cv);
     const bitmapData = result.data.map((v) => (v === 1 ? 255 : 0));
@@ -184,8 +184,10 @@ export class DBPostProcess {
       const contour = contours.get(i);
       const epsilon = 0.002 * this.cv.arcLength(contour, true);
       const approx = new this.cv.Mat();
+
       this.cv.approxPolyDP(contour, approx, epsilon, true);
-      const points = approx.reshape(0, 4); // (N,1,2) -> (N,2)
+
+      const points = approx;
       if (points.rows < 4) {
         continue;
       }
@@ -202,7 +204,17 @@ export class DBPostProcess {
       }
       let box: Mat;
       if (points.rows > 2) {
-        const pointsNdArray = matToNdArray(points, this.cv, true); // (N,2)
+        let pointsNdArray = matToNdArray(points, this.cv, true); // 可能性: [N,1,2]
+        if (
+          pointsNdArray.shape.length === 3 &&
+          pointsNdArray.shape[1] === 1 &&
+          pointsNdArray.shape[2] === 2
+        ) {
+          pointsNdArray = ndarray(pointsNdArray.data, [
+            pointsNdArray.shape[0]!,
+            pointsNdArray.shape[2]!,
+          ]);
+        }
         const unclipedBox = await this.ndArrayUnclip(
           pointsNdArray,
           this.unclip_ratio,
@@ -212,13 +224,11 @@ export class DBPostProcess {
           continue;
         }
         box =
-          unclipedBox === null
-            ? points
-            : ndArrayToMat(unclipedBox, this.cv).reshape(-1, 2);
+          unclipedBox === null ? points : ndArrayToMat(unclipedBox, this.cv);
       } else {
         continue;
       }
-      const [_box, sside] = this.get_mini_boxes(box.reshape(-1, 1, 2));
+      const [_box, sside] = this.get_mini_boxes(box);
       if (sside < this.min_size + 2) {
         continue;
       }
@@ -257,7 +267,7 @@ export class DBPostProcess {
         -1,
         1
       );
-      boxes.push(ndArrayToList(ndArrayBoxUpdated));
+      boxes.push(ndArrayToList(ndArrayBoxUpdated) as Point[]);
       scores.push(score);
     }
     // メモリクリーンアップ
@@ -265,12 +275,7 @@ export class DBPostProcess {
     contours.delete();
     _hierarchy.delete();
 
-    const boxesNdArray = ndarray(
-      Int32Array.from((boxes as number[][][]).flat(Infinity)),
-      [boxes.length, 4, 2]
-    );
-
-    return [boxesNdArray, scores];
+    return [boxes, scores];
   }
 
   async boxes_from_bitmap(
@@ -548,10 +553,11 @@ export class DBPostProcess {
       Uint8Array.from(Array((ymax - ymin + 1) * (xmax - xmin + 1)).fill(0))
     );
 
-    const boxCV = ndArrayToMat(pickedN1, this.cv).reshape(-1, 1, 2);
+    const boxCV = ndArrayToMat(pickedN1, this.cv);
     const vectorBoxCV = new this.cv.MatVector();
     vectorBoxCV.push_back(boxCV);
-    this.cv.fillPoly(maskCV, vectorBoxCV, 1);
+    const color = new this.cv.Scalar(1, 1, 1, 1);
+    this.cv.fillPoly(maskCV, vectorBoxCV, color);
     const clonedBitmap = cloneNdArray(bitmap);
     const picked = clonedBitmap.hi(ymax + 1, xmax + 1).lo(ymin, xmin);
     return this.cv.mean(ndArrayToMat(picked, this.cv), maskCV)[0]!;
