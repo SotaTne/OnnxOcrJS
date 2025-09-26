@@ -10,14 +10,13 @@ import type {
 } from "./types/paddle_types.js";
 import type { NdArray } from "ndarray";
 import type { Box, CV2, Point } from "./types/type.js";
-import { MatVector, type Mat } from "@techstark/opencv-js";
+import type { Mat, Point2f } from "@techstark/opencv-js";
 import {
   clip,
   cloneNdArray,
   matToLine,
   matToList,
   matToNdArray,
-  matToPoints,
   ndArrayToList,
   pickAndSet,
   unclip,
@@ -49,7 +48,7 @@ export type DBPostProcessParams = {
 //   points:Point[]
 // }
 
-type OutDict = {
+export type OutDict = {
   maps: NdArray;
 };
 
@@ -103,7 +102,9 @@ export class DBPostProcess {
       throw new Error("pred.shape[0] and segmentationPred shape[0] mismatch");
     }
 
-    const boxes_batch: any[] = [];
+    const boxes_batch: {
+      points: NdArray;
+    }[] = [];
     for (let batch_index = 0; batch_index < pred.shape[0]; batch_index++) {
       const [src_h, src_w, ratio_h, ratio_w] = shape_list[batch_index]!;
       const currentSegment = segmentationPred.pick(batch_index, -1, -1); // segmentationPred[batch_index]
@@ -154,7 +155,7 @@ export class DBPostProcess {
     _bitmap: Mat,
     dest_width: number,
     dest_height: number
-  ): Promise<[NdArrayListData[], number[]]> {
+  ): Promise<[NdArray, number[]]> {
     const bitmap = _bitmap;
     const height = bitmap.rows;
     const width = bitmap.cols;
@@ -200,7 +201,7 @@ export class DBPostProcess {
         continue;
       }
       let box: Mat;
-      if (points.cols > 2) {
+      if (points.rows > 2) {
         const pointsNdArray = matToNdArray(points, this.cv, true); // (N,2)
         const unclipedBox = await this.ndArrayUnclip(
           pointsNdArray,
@@ -264,7 +265,12 @@ export class DBPostProcess {
     contours.delete();
     _hierarchy.delete();
 
-    return [boxes, scores];
+    const boxesNdArray = ndarray(
+      Int32Array.from((boxes as number[][][]).flat(Infinity)),
+      [boxes.length, 4, 2]
+    );
+
+    return [boxesNdArray, scores];
   }
 
   async boxes_from_bitmap(
@@ -543,7 +549,7 @@ export class DBPostProcess {
     );
 
     const boxCV = ndArrayToMat(pickedN1, this.cv).reshape(-1, 1, 2);
-    const vectorBoxCV = new MatVector();
+    const vectorBoxCV = new this.cv.MatVector();
     vectorBoxCV.push_back(boxCV);
     this.cv.fillPoly(maskCV, vectorBoxCV, 1);
     const clonedBitmap = cloneNdArray(bitmap);
@@ -634,7 +640,7 @@ export class DBPostProcess {
     );
 
     const counterCV = ndArrayToMat(pikedN1, this.cv).reshape(-1, 1, 2);
-    const vectorBoxCV = new MatVector();
+    const vectorBoxCV = new this.cv.MatVector();
     vectorBoxCV.push_back(counterCV);
     this.cv.fillPoly(maskCV, vectorBoxCV, 1);
     const clonedBitmap = cloneNdArray(bitmap);
@@ -644,9 +650,12 @@ export class DBPostProcess {
 
   get_mini_boxes(counter: Mat): [Box, number] {
     const bounding_box = this.cv.minAreaRect(counter);
-    const matPoints: Mat = new cv.Mat();
-    cv.boxPoints(bounding_box, matPoints);
-    const beforePoints: Point[] = matToPoints(matPoints, cv);
+    // const matPoints: Mat = new this.cv.Mat();
+    // this.cv.boxPoints(bounding_box, matPoints);
+    const f2Points = this.cv.boxPoints(bounding_box);
+    // const beforePoints: Point[] = matToPoints(matPoints, this.cv);
+    const beforePoints: Point[] = f2Points.map((p) => [p.x, p.y]);
+
     if (beforePoints.length !== 4) {
       throw new Error("shape of points must be 4*2");
     }
