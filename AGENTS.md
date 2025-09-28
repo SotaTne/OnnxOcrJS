@@ -1,23 +1,70 @@
-# Repository Guidelines
-This guide keeps OnnxOcrJS contributors aligned on structure, tooling, and expectations when extending the ONNX-based PaddleOCR pipeline.
+# リポジトリ ガイドライン
 
-## Project Structure & Module Organization
-Core TypeScript sources live under `src/`. `src/predict_system.ts` orchestrates detection (`predict_det.ts`), recognition (`predict_rec.ts`), and optional angle classification (`predict_cls.ts`). Shared geometry helpers sit in `src/utils/`, and reusable types are in `src/types/`. Pretrained weights and configs are in `models/` (e.g., `ppocrv5/`); treat them as read-only artifacts and document provenance when swapping files. The compiler writes build artifacts to `dist/`; never edit generated output directly.
+このガイドは、OnnxOcrJS のコントリビューターが、ONNX ベースの PaddleOCR パイプラインを拡張する際に、構成・ツール・期待値を揃えるためのものです。
 
-## Build, Test, and Development Commands
-- `pnpm install` — install dependencies pinned by `pnpm-lock.yaml`.
-- `pnpm build` — run the TypeScript compiler (`tsc`) using `tsconfig.json`, emitting `.js` and declaration files.
-- `pnpm test` — execute the Vitest test suite; append `--watch` when iterating.
-Verify large model folders with `du -sh models/*` before committing to catch accidental bloat.
+## プロジェクト構成とモジュール整理
 
-## Coding Style & Naming Conventions
-Use 2-space indentation and keep files as ES modules. Apply `camelCase` for variables/functions, `PascalCase` for classes (`TextSystem`, `TextDetector`), and UPPER_SNAKE_CASE for constants. Prefer named exports, grouping external imports before relative ones. Honor strict typing—narrow `unknown` results, avoid `any`, and co-locate helper functions with their domain (`utils` for math/image transforms, `types` for structures).
+TypeScript のソースコードは `src/` 配下に配置します。  
+`src/predict_system.ts` が全体のオーケストレーションを担い、検出（`predict_det.ts`）、認識（`predict_rec.ts`）、必要に応じて角度分類（`predict_cls.ts`）を呼び出します。  
+共通のジオメトリ処理ヘルパーは `src/utils/`、再利用可能な型は `src/types/` に配置します。  
 
-## Testing Guidelines
-Vitest is the primary framework. Co-locate new specs as `*.test.ts`/`*.spec.ts` next to the code under test (e.g., `src/utils/boxes.test.ts`, `src/utils/boxes.spec.ts`). Use descriptive `describe` and `it` names that reflect OCR scenarios, and cover threshold logic, box ordering, and angle classification branches. When OpenCV operations are heavy, stub them with lightweight fixtures housed in `src/utils/__fixtures__/` to keep tests fast.
+事前学習済みの重みや設定ファイルは `models/`（例: `ppocrv5/`）に置き、読み取り専用の成果物として扱います。ファイルを差し替える場合は、その由来を必ずドキュメント化してください。  
+ビルド成果物は `dist/` に出力されます。生成されたファイルは直接編集しないでください。
 
-## Commit & Pull Request Guidelines
-Existing history follows Conventional Commits (`feat:`, `fix:`, `chore:`). Keep each commit focused, include relevant script or doc updates, and run `pnpm build`/`pnpm test` beforehand. PRs should describe behaviour changes, list the validation commands, link tracking issues, and highlight any model asset updates (include hashes or download instructions).
+## ビルド・テスト・開発コマンド
 
-## Model Assets & Configuration Tips
-Large ONNX files can overwhelm diffs; consider linking to external storage and documenting checksum/expected dimensions in the PR. Track preprocessing parameters (mean/scale, padding, angle settings) with the code change so integrators can reproduce results.
+- `pnpm install` — `pnpm-lock.yaml` で固定された依存関係をインストール。
+- `pnpm build` — TypeScript コンパイラ（`tsc`）を実行し、`.js` と型定義ファイルを出力。
+- `pnpm test` — Vitest のテストスイートを実行。開発中は `--watch` を付けて反復。
+
+モデルフォルダが肥大化していないか確認するため、コミット前に `du -sh models/*` を実行してください。
+
+## コーディングスタイルと命名規則
+
+- インデントは 2 スペース。
+- すべて ES モジュールとして記述。
+- 命名規則:
+  - 変数・関数: `camelCase`
+  - クラス: `PascalCase`（例: `TextSystem`, `TextDetector`）
+  - 定数: `UPPER_SNAKE_CASE`
+- import は外部ライブラリ → 相対パスの順にまとめる。
+- 厳格な型付けを徹底する（`unknown` は絞り込み、`any` は避ける）。
+- ヘルパー関数は関連するドメインと同じ場所に配置する（例: 数学/画像変換は `utils`、構造体は `types`）。
+
+## テストガイドライン
+
+テストフレームワークは Vitest を使用します。  
+テストは対象コードの隣に配置してください（例: `src/utils/boxes.test.ts`, `src/utils/boxes.spec.ts`）。  
+
+- `describe` と `it` には OCR のシナリオが分かる説明的な名前を付ける。
+- しきい値ロジック、ボックスの並び順、角度分類の分岐などをカバーする。
+- OpenCV の処理が重い場合は、軽量なフィクスチャを `src/utils/__fixtures__/` に置き、スタブ化してテストを高速化する。
+
+## コミットとプルリクエストのガイドライン
+
+- コミットメッセージは Conventional Commits に従う（例: `feat:`, `fix:`, `chore:`）。
+- コミットは小さく集中させ、スクリプトやドキュメントの更新も含める。
+- コミット前に `pnpm build` / `pnpm test` を必ず実行する。
+- PR には以下を含める:
+  - 動作変更の説明
+  - 検証コマンド
+  - 関連 issue のリンク
+  - モデルアセットを更新した場合は、そのハッシュやダウンロード方法
+
+## モデルアセットと設定の注意点
+
+大きな ONNX ファイルは diff を圧迫するため、外部ストレージへのリンクを検討してください。PR ではチェックサムや期待される入力サイズを記録すること。  
+前処理パラメータ（mean/scale、padding、角度設定など）は、再現性のためコード変更と一緒に追跡してください。
+
+## 開発方針
+
+- 日本語でコミュニケーションを取ってください
+- タスクが振られた場合は、まずSerenaを使用して必要な情報とタスクに必要な情報を取得して、必要であればWeb検索を行い、まずどのような手順・仕様で実装するかを決定してください
+- コードの変更にはコマンドは絶対に使わないでください
+- コードの変更には必ずTypeScriptを使用してください
+- Serenaを利用してDRY原則を守るようにしてください
+- 実装方法が複数ある場合は可能な限り既存のパターンを遵守するようにしてください
+- 副作用付きの関数は可能な限り作らず、一つの関数は大きくとも100~200行程度までで抑えてください
+- コードの変更を行う場合は必ずテストコードも追加してください
+- 変更によって他の部分に出る影響は最小限になるようにしてください
+- 簡単なタスクであっても必ず計画と、必要な影響範囲を把握してください
