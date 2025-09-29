@@ -144,7 +144,7 @@ export class TextDetector extends PredictBase {
       return [null, 0];
     }
     const img = transformed[0]! as Data["image"];
-    const shape = transformed[0]! as Data["shape"];
+    const shape = transformed[1]! as Data["shape"];
   }
 
   async create_onnx_session(
