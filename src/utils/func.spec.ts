@@ -1,4 +1,4 @@
-import type { Box, Point } from "../types/type.js";
+import type { Box, ORT, ORTTensorType, Point } from "../types/type.js";
 import {
   argmax,
   boxToLine,
@@ -17,6 +17,7 @@ import {
   pickAndSet,
   polygonArea,
   polygonPerimeter,
+  tensorToNdArray,
   unclip,
   type NdArrayListData,
 } from "./func.js";
@@ -26,10 +27,13 @@ import ndarray, { type NdArray } from "ndarray";
 import ops from "ndarray-ops";
 
 let cv: Awaited<typeof cvReadyPromiseType>;
+let ort: ORT;
 
 beforeAll(async () => {
   /// @ts-ignore
   const cvReadyPromise = require("@techstark/opencv-js");
+  const nodeORT = require("onnxruntime-node");
+  ort = nodeORT;
   cv = await cvReadyPromise;
 });
 
@@ -2143,5 +2147,76 @@ describe("max / argmax - edge cases", () => {
     ];
     expect(max(arr, -1)).toEqual([[[5, 9]], [[7, 8]]]);
     expect(argmax(arr, -1)).toEqual([[[1, 0]], [[2, 1]]]);
+  });
+});
+
+describe("tensorToNdArray", () => {
+  it("converts Float32 Tensor (2D) to NdArray", () => {
+    const data = new Float32Array([1.1, 2.2, 3.3, 4.4]);
+    const shape = [2, 2];
+    const tensor: ORTTensorType = new ort.Tensor("float32", data, shape);
+
+    const result = tensorToNdArray(tensor);
+    expect(result.shape).toEqual([2, 2]);
+    expect(result.get(0, 0)).toBeCloseTo(1.1);
+    expect(result.get(1, 1)).toBeCloseTo(4.4);
+  });
+
+  it("converts Int32 Tensor (3D) to NdArray", () => {
+    const data = new Int32Array([1, 2, 3, 4, 5, 6]);
+    const shape = [1, 2, 3];
+    const tensor: ORTTensorType = new ort.Tensor("int32", data, shape);
+
+    const result = tensorToNdArray(tensor);
+    expect(result.shape).toEqual([1, 2, 3]);
+    expect(result.get(0, 1, 2)).toBe(6);
+  });
+
+  it("converts Uint8 Tensor (4D) to NdArray", () => {
+    const shape = [2, 2, 2, 2]; // 16 要素
+    const data = new Uint8Array(shape.reduce((a, b) => a * b)).map(
+      (_, i) => i + 1
+    );
+    const tensor: ORTTensorType = new ort.Tensor("uint8", data, shape);
+
+    const result = tensorToNdArray(tensor);
+    expect(result.shape).toEqual([2, 2, 2, 2]);
+    expect(result.get(1, 1, 1, 1)).toBe(data[data.length - 1]);
+  });
+
+  it("converts Float32 Tensor (5D) to NdArray", () => {
+    const shape = [2, 2, 2, 2, 2]; // 32 要素
+    const data = new Float32Array(shape.reduce((a, b) => a * b)).map(
+      (_, i) => i * 0.5
+    );
+    const tensor: ORTTensorType = new ort.Tensor("float32", data, shape);
+
+    const result = tensorToNdArray(tensor);
+    expect(result.shape).toEqual(shape);
+    expect(result.get(1, 1, 1, 1, 1)).toBeCloseTo(data[data.length - 1]!);
+  });
+
+  it("handles empty Tensor gracefully", () => {
+    const data = new Float32Array([]);
+    const shape = [0];
+    const tensor: ORTTensorType = new ort.Tensor("float32", data, shape);
+
+    const result = tensorToNdArray(tensor);
+    expect(result.shape).toEqual([0]);
+    expect(result.size).toBe(0);
+  });
+
+  it("throws if tensor.data is Array", () => {
+    const fakeTensor: any = { data: [1, 2, 3], dims: [3] };
+    expect(() => tensorToNdArray(fakeTensor)).toThrow(
+      "tensorToNdArray: tensor.data is an array, expected TypedArray"
+    );
+  });
+
+  it("throws if tensor.data is BigUint64Array", () => {
+    const fakeTensor: any = { data: new BigUint64Array([1n, 2n]), dims: [2] };
+    expect(() => tensorToNdArray(fakeTensor)).toThrow(
+      "tensorToNdArray: tensor.data is an array, expected TypedArray"
+    );
   });
 });

@@ -13,18 +13,13 @@ import type {
 
 export abstract class PredictBase {
   abstract ort: ORT;
-  abstract onnx_session?: ORTSessionReturnType;
 
-  abstract create_onnx_session(
+  static get_onnx_session(
     modelArrayBuffer: ORTBufferType,
-    use_gpu: USE_GCU
-  ): Promise<ORTSessionReturnType>;
-
-  get_onnx_session(): ORTSessionReturnType {
-    if (!this.onnx_session) {
-      throw new Error("ONNX session is not initialized.");
-    }
-    return this.onnx_session;
+    use_gpu: USE_GCU,
+    ort: ORT
+  ): Promise<ORTSessionReturnType> {
+    throw new Error("Method not implemented.");
   }
 
   get_output_name(session: ORTSessionReturnType) {
@@ -35,8 +30,7 @@ export abstract class PredictBase {
     return get_input_name_fn(session);
   }
 
-  get_input_feed(session: ORTSessionReturnType, input_data: ORTTensorType) {
-    const input_names = this.get_input_name(session);
+  get_input_feed(input_names: string[], input_data: ORTTensorType) {
     return get_input_feed_fn(input_names, input_data);
   }
 }

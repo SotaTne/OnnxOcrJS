@@ -1,5 +1,5 @@
 import type { Mat } from "@techstark/opencv-js";
-import type { Box, CV2, Point } from "../types/type.js";
+import type { Box, CV2, ORTTensorType, Point } from "../types/type.js";
 import type { NdArray } from "ndarray";
 import ndarray from "ndarray";
 import ops from "ndarray-ops";
@@ -654,4 +654,15 @@ export function max(arr: NdArrayLike, axis: number) {
 
 export function argmax(arr: NdArrayLike, axis: number) {
   return reduceArgmax(arr, axis);
+}
+
+export function tensorToNdArray(tensor: ORTTensorType): NdArray {
+  const data = tensor.data;
+  const shape = [...tensor.dims];
+  if (Array.isArray(data) || data instanceof BigUint64Array) {
+    throw new Error(
+      "tensorToNdArray: tensor.data is an array, expected TypedArray"
+    );
+  }
+  return ndarray(data as ndarray.TypedArray, shape);
 }

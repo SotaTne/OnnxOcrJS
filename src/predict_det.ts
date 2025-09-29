@@ -3,8 +3,10 @@ import type {
   CV2,
   Data,
   DataValues,
+  NdArrayData,
   ORT,
   ORTBufferType,
+  ORTRunFetchesType,
   ORTSessionReturnType,
   Point,
 } from "./types/type.js";
@@ -13,7 +15,11 @@ import {
   transform,
   type PreProcessOperator,
 } from "./utils/operators.js";
-import { DBPostProcess, type DBPostProcessParams } from "./db_postprocess.js";
+import {
+  DBPostProcess,
+  type DBPostProcessParams,
+  type OutDict,
+} from "./db_postprocess.js";
 import type {
   DET_BOX_TYPE,
   DET_DB_BOX_THRESH,
@@ -26,6 +32,12 @@ import type {
 import { PredictBase } from "./predict_base.js";
 import type { InferenceSession } from "onnxruntime-web";
 import { create_onnx_session_fn } from "./onnx_runtime.js";
+import {
+  cloneNdArray,
+  euclideanDistance,
+  ndArrayToList,
+  tensorToNdArray,
+} from "./utils/func.js";
 
 let _det_onnx_session: ORTSessionReturnType | undefined = undefined;
 
@@ -41,6 +53,8 @@ export type TextDetectorParams = {
   det_box_type: DET_BOX_TYPE;
   cv: CV2;
   ort: ORT;
+  model_array_buffer: ORTBufferType;
+  use_gpu: USE_GCU;
 };
 
 export class TextDetector extends PredictBase {
@@ -48,9 +62,17 @@ export class TextDetector extends PredictBase {
   postprocess_op: DBPostProcess;
   preprocess_op: PreProcessOperator[];
   ort: ORT;
-  onnx_session?: InferenceSession;
+  det_onnx_session: ORTSessionReturnType;
+  det_input_name: string[];
+  det_output_name: string[];
+  det_box_type: DET_BOX_TYPE;
 
-  constructor(params: TextDetectorParams) {
+  constructor(
+    params:
+      | TextDetectorParams & {
+          det_onnx_session: ORTSessionReturnType;
+        }
+  ) {
     super();
     this.cv = params.cv;
     this.ort = params.ort;
@@ -98,6 +120,21 @@ export class TextDetector extends PredictBase {
       cv: this.cv,
     };
     this.postprocess_op = new DBPostProcess(postprocess_params);
+
+    this.det_box_type = params.det_box_type;
+
+    this.det_onnx_session = params.det_onnx_session;
+    this.det_input_name = this.get_input_name(this.det_onnx_session);
+    this.det_output_name = this.get_output_name(this.det_onnx_session);
+  }
+
+  static async create(params: TextDetectorParams) {
+    const det_onnx_session = await TextDetector.get_onnx_session(
+      params.model_array_buffer,
+      params.use_gpu,
+      params.ort
+    );
+    return new TextDetector({ ...params, det_onnx_session });
   }
 
   order_points_clockwise(pts: Point[]): Point[] {
@@ -128,39 +165,114 @@ export class TextDetector extends PredictBase {
     return rect;
   }
 
-  clip_det_res() {}
+  clip_det_res(points: Point[], img_height: number, img_width: number) {
+    let new_points = [...points];
+    for (let p of new_points) {
+      p[0] = Math.floor(Math.min(Math.max(p[0], 0), img_width - 1));
+      p[1] = Math.floor(Math.min(Math.max(p[1], 0), img_height - 1));
+    }
+    return new_points;
+  }
 
-  filter_tag_det_res() {}
+  filter_tag_det_res(dt_boxes: Point[][], image_shape: number[]) {
+    const [img_height, img_width] = image_shape;
+    const db_boxes_new = [];
+    for (const box of dt_boxes) {
+      let box_new = this.order_points_clockwise(box);
+      box_new = this.clip_det_res(box_new, img_height!, img_width!);
+      const rect_width = Math.floor(
+        euclideanDistance(box_new[0]!, box_new[1]!)
+      );
+      const rect_height = Math.floor(
+        euclideanDistance(box_new[0]!, box_new[3]!)
+      );
+      if (rect_width <= 3 || rect_height <= 3) {
+        continue;
+      }
+      db_boxes_new.push(box_new);
+    }
+    return db_boxes_new;
+  }
 
-  filter_tag_det_res_only_clip() {}
+  filter_tag_det_res_only_clip(dt_boxes: Point[][], image_shape: number[]) {
+    const [img_height, img_width] = image_shape;
+    const db_boxes_new = [];
+    for (const box of dt_boxes) {
+      const box_new = this.clip_det_res(box, img_height!, img_width!);
+      db_boxes_new.push(box_new);
+    }
+    return db_boxes_new;
+  }
 
-  execute(_img: Mat) {
+  async execute(_img: Mat) {
     const ori_im = _img.clone();
     const data: Data = { image: ori_im, shape: null };
     const transformed = transform(data, this.preprocess_op) as
       | DataValues[]
       | null;
-    if (transformed === null) {
+    if (transformed === null || transformed[0] === null) {
       return [null, 0];
     }
-    const img = transformed[0]! as Data["image"];
-    const shape = transformed[1]! as Data["shape"];
+    const img = transformed[0]! as NdArrayData["image"];
+    const shape_list = transformed[1]! as Data["shape"];
+
+    const cloned_img = cloneNdArray(img);
+
+    const img_buffer = Float32Array.from(
+      (ndArrayToList(cloned_img) as number[][][]).flat(Infinity)
+    );
+    const img_shape = [1, ...cloned_img.shape];
+    const tensor_img = new this.ort.Tensor("float32", img_buffer, img_shape);
+    const input_feed = this.get_input_feed(this.det_input_name, tensor_img);
+
+    const ort_run_fetches: ORTRunFetchesType = this.det_output_name;
+
+    const outputs = await this.det_onnx_session.run(
+      input_feed,
+      ort_run_fetches
+    );
+
+    const result_preds = outputs[0];
+
+    if (!result_preds) {
+      throw new Error("No output from the model");
+    }
+    const preds: OutDict = { maps: tensorToNdArray(result_preds) };
+    const post_shape_list = shape_list ? [shape_list] : [];
+
+    const post_result = await this.postprocess_op.execute(
+      preds,
+      post_shape_list
+    );
+
+    const dt_boxes = post_result[0]!["points"];
+
+    const dt_boxes_array = (
+      Array.isArray(dt_boxes)
+        ? dt_boxes
+        : (ndArrayToList(dt_boxes) as number[][][])
+    ) as Point[][];
+
+    if (this.det_box_type === "poly") {
+      return this.filter_tag_det_res_only_clip(dt_boxes_array, img.shape);
+    } else {
+      return this.filter_tag_det_res(dt_boxes_array, img.shape);
+    }
   }
 
-  async create_onnx_session(
+  static async get_onnx_session(
     modelArrayBuffer: ORTBufferType,
-    use_gpu: USE_GCU
+    use_gpu: USE_GCU,
+    ort: ORT
   ): Promise<ORTSessionReturnType> {
     if (_det_onnx_session) {
-      this.onnx_session = _det_onnx_session;
       return _det_onnx_session;
     }
     _det_onnx_session = await create_onnx_session_fn(
-      this.ort,
+      ort,
       modelArrayBuffer,
       use_gpu
     );
-    this.onnx_session = _det_onnx_session;
     return _det_onnx_session;
   }
 }
