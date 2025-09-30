@@ -1,6 +1,7 @@
 import type { Box, ORT, ORTTensorType, Point } from "../types/type.js";
 import {
   argmax,
+  argsort,
   boxToLine,
   boxToMat,
   broadcastTo,
@@ -2218,5 +2219,54 @@ describe("tensorToNdArray", () => {
     expect(() => tensorToNdArray(fakeTensor)).toThrow(
       "tensorToNdArray: tensor.data is an array, expected TypedArray"
     );
+  });
+});
+
+describe("argsort", () => {
+  it("returns indices that would sort an array in ascending order", () => {
+    const arr = [30, 10, 20];
+    const indices = argsort(arr);
+    expect(indices).toEqual([1, 2, 0]); // 10, 20, 30 の順
+    expect(indices.map((i) => arr[i])).toEqual([10, 20, 30]);
+  });
+
+  it("handles already sorted array", () => {
+    const arr = [1, 2, 3];
+    const indices = argsort(arr);
+    expect(indices).toEqual([0, 1, 2]);
+  });
+
+  it("handles descending array", () => {
+    const arr = [3, 2, 1];
+    const indices = argsort(arr);
+    expect(indices).toEqual([2, 1, 0]);
+    expect(indices.map((i) => arr[i])).toEqual([1, 2, 3]);
+  });
+
+  it("handles duplicates correctly (stable sort)", () => {
+    const arr = [5, 1, 5, 2];
+    const indices = argsort(arr);
+    // 1 → index=1, 2 → index=3, 5 → indices=[0,2]
+    expect(indices).toEqual([1, 3, 0, 2]);
+    expect(indices.map((i) => arr[i])).toEqual([1, 2, 5, 5]);
+  });
+
+  it("handles negative numbers", () => {
+    const arr = [0, -10, 5, -3];
+    const indices = argsort(arr);
+    expect(indices).toEqual([1, 3, 0, 2]);
+    expect(indices.map((i) => arr[i])).toEqual([-10, -3, 0, 5]);
+  });
+
+  it("handles empty array", () => {
+    const arr: number[] = [];
+    const indices = argsort(arr);
+    expect(indices).toEqual([]);
+  });
+
+  it("handles single-element array", () => {
+    const arr = [42];
+    const indices = argsort(arr);
+    expect(indices).toEqual([0]);
   });
 });

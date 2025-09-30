@@ -666,3 +666,26 @@ export function tensorToNdArray(tensor: ORTTensorType): NdArray {
   }
   return ndarray(data as ndarray.TypedArray, shape);
 }
+
+export function argsort(arr: number[]): number[] {
+  return arr
+    .map((value, index) => ({ value, index }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.index);
+}
+
+export function zeroNdArray(
+  constructorOrIsArray: Function | boolean,
+  shape: number[]
+) {
+  const mul_shape = shape.reduce((a, b) => a * b, 1);
+  let newData: ndarray.TypedArray | number[];
+  if (typeof constructorOrIsArray === "function") {
+    const ArrayCtor = constructorOrIsArray as { new (size: number): any };
+    newData = new ArrayCtor(mul_shape);
+  } else {
+    newData = new Array(mul_shape);
+  }
+  newData.fill(0);
+  return ndarray(newData, shape);
+}

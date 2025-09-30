@@ -120,6 +120,12 @@ export class CTCLabelDecode extends BaseRecLabelDecode {
     super(params);
   }
 
+  execute(preds: number[][][], label: null): [string, number][];
+  execute(
+    preds: number[][][],
+    label: number[][]
+  ): [[string, number][], [string, number][]];
+
   execute(preds: number[][][], label: number[][] | null = null) {
     // preds: shape [batch, seq, num_classes]
     const preds_idx: number[][] = argmax(preds, 2) as number[][];

@@ -9,18 +9,25 @@ export type USE_GCU = boolean;
 export type IR_OPTIM = boolean;
 export type USE_TENSORRT = boolean;
 export type MIN_SUBGRAPH_SIZE = number;
-export type PRECISION = 'fp32' | 'fp16' | 'int8';
+export type PRECISION = "fp32" | "fp16" | "int8";
 export type GPU_MEM = number;
 export type GPU_ID = number;
 
 // テキスト検出器パラメータ
 export type IMAGE_DIR = string;
 export type PAGE_NUM = number;
-export type DET_ALGORITHM = 'DB' | 'DB++' | 'EAST' | 'SAST' | 'PSE' | 'FCE' | 'CT';
+export type DET_ALGORITHM =
+  | "DB"
+  | "DB++"
+  | "EAST"
+  | "SAST"
+  | "PSE"
+  | "FCE"
+  | "CT";
 export type DET_MODEL_DIR = `${string}.onnx`;
 export type DET_LIMIT_SIDE_LEN = number;
-export type DET_LIMIT_TYPE = 'max' | 'min';
-export type DET_BOX_TYPE = 'quad' | 'poly';
+export type DET_LIMIT_TYPE = "max" | "min";
+export type DET_BOX_TYPE = "quad" | "poly";
 
 // DB/DB++パラメータ
 export type DET_DB_THRESH = number;
@@ -28,7 +35,7 @@ export type DET_DB_BOX_THRESH = number;
 export type DET_DB_UNCLIP_RATIO = number;
 export type MAX_BATCH_SIZE = number;
 export type USE_DILATION = boolean;
-export type DET_DB_SCORE_MODE = 'slow' | 'fast';
+export type DET_DB_SCORE_MODE = "slow" | "fast";
 
 // EASTパラメータ
 export type DET_EAST_SCORE_THRESH = number;
@@ -52,10 +59,19 @@ export type BETA = number;
 export type FOURIER_DEGREE = number;
 
 // テキスト認識器パラメータ
-export type REC_ALGORITHM = 'SVTR_LCNet' | 'CRNN' | 'SVTR_HGNet' | 'SRN' | string;
+export type REC_ALGORITHM =
+  | "SVTR_LCNet"
+  // | "CRNN"
+  // | "SVTR_HGNet"
+  // | "SRN"
+  | "NRTR"
+  | "RFL"
+  | "RARE"
+  | "ViTSTR";
 export type REC_MODEL_DIR = `${string}.onnx`;
 export type REC_IMAGE_INVERSE = boolean;
 export type REC_IMAGE_SHAPE = string; // "3, 48, 320"形式
+export type REC_IMAGE_SHAPE_NUMBER = number[]; // [3, 48, 320]
 export type REC_BATCH_NUM = number;
 export type MAX_TEXT_LENGTH = number;
 export type REC_CHAR_DICT_PATH = string;
@@ -64,16 +80,16 @@ export type VIS_FONT_PATH = string;
 export type DROP_SCORE = number;
 
 // End-to-Endパラメータ
-export type E2E_ALGORITHM = 'PGNet' | string;
+export type E2E_ALGORITHM = "PGNet" | string;
 export type E2E_MODEL_DIR = string;
 export type E2E_LIMIT_SIDE_LEN = number;
-export type E2E_LIMIT_TYPE = 'max' | 'min';
+export type E2E_LIMIT_TYPE = "max" | "min";
 
 // PGNetパラメータ
 export type E2E_PGNET_SCORE_THRESH = number;
 export type E2E_CHAR_DICT_PATH = string;
-export type E2E_PGNET_VALID_SET = 'totaltext' | string;
-export type E2E_PGNET_MODE = 'fast' | 'slow';
+export type E2E_PGNET_VALID_SET = "totaltext" | string;
+export type E2E_PGNET_MODE = "fast" | "slow";
 
 // テキスト分類器パラメータ
 export type USE_ANGLE_CLS = boolean;

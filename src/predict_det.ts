@@ -53,7 +53,7 @@ export type TextDetectorParams = {
   det_box_type: DET_BOX_TYPE;
   cv: CV2;
   ort: ORT;
-  model_array_buffer: ORTBufferType;
+  det_model_array_buffer: ORTBufferType;
   use_gpu: USE_GCU;
 };
 
@@ -130,7 +130,7 @@ export class TextDetector extends PredictBase {
 
   static async create(params: TextDetectorParams) {
     const det_onnx_session = await TextDetector.get_onnx_session(
-      params.model_array_buffer,
+      params.det_model_array_buffer,
       params.use_gpu,
       params.ort
     );
@@ -211,7 +211,7 @@ export class TextDetector extends PredictBase {
       | DataValues[]
       | null;
     if (transformed === null || transformed[0] === null) {
-      return [null, 0];
+      return null;
     }
     const img = transformed[0]! as NdArrayData["image"];
     const shape_list = transformed[1]! as Data["shape"];
