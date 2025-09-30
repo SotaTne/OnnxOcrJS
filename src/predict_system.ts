@@ -51,10 +51,9 @@ export class TextSystem {
   static async create(params: TextSystemParams) {
     const text_detector = await TextDetector.create(params);
     const text_recognizer = await TextRecognizer.create(params);
-    const text_classifier =
-      params.use_angle_cls && params.text_classifier
-        ? await TextClassifier.create(params)
-        : null;
+    const text_classifier = params.use_angle_cls
+      ? await TextClassifier.create(params)
+      : null;
     return new TextSystem({
       ...params,
       text_detector,

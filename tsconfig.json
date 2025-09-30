@@ -42,5 +42,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "exclude": ["vitest.*.ts"]
+  "exclude": ["vitest.*.ts", "node_modules", "dist", "test", "examples"]
 }

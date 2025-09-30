@@ -26,6 +26,7 @@
     "./models/*": "./models/*"
   },
   "dependencies": {
+    "blakejs": "^1.2.1",
     "clipper-lib": "^6.4.2",
     "js-angusj-clipper": "^1.3.1",
     "ndarray": "^1.0.19",

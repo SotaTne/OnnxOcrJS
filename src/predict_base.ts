@@ -10,6 +10,7 @@ import type {
   ORTSessionReturnType,
   ORTTensorType,
 } from "./types/type.js";
+import { blake2bHex } from "blakejs";
 
 export abstract class PredictBase {
   abstract ort: ORT;
@@ -32,5 +33,14 @@ export abstract class PredictBase {
 
   get_input_feed(input_names: string[], input_data: ORTTensorType) {
     return get_input_feed_fn(input_names, input_data);
+  }
+
+  static get_model_hash(modelArrayBuffer: ORTBufferType) {
+    return blake2bHex(modelArrayBuffer, undefined, 32);
+  }
+
+  static is_match_hash(modelArrayBuffer: ORTBufferType, hash: string) {
+    const modelHash = this.get_model_hash(modelArrayBuffer);
+    return modelHash === hash;
   }
 }

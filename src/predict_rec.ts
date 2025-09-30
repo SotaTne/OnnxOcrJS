@@ -28,7 +28,10 @@ import { CTCLabelDecode } from "./rec_postprocess.js";
 import ndarray from "ndarray";
 import ops from "ndarray-ops";
 
-let _rec_onnx_session: ORTSessionReturnType | undefined = undefined;
+let _use_gpu_rec_onnx_session: ORTSessionReturnType | undefined = undefined;
+let _use_gpu_session_hash: string | undefined = undefined;
+let _use_cpu_rec_onnx_session: ORTSessionReturnType | undefined = undefined;
+let _use_cpu_session_hash: string | undefined = undefined;
 
 export type TextRecognizerParams = {
   drop_score: DROP_SCORE | null;
@@ -301,14 +304,29 @@ export class TextRecognizer extends PredictBase {
     use_gpu: USE_GCU,
     ort: ORT
   ): Promise<ORTSessionReturnType> {
-    if (_rec_onnx_session) {
-      return _rec_onnx_session;
+    const modelHash = this.get_model_hash(modelArrayBuffer);
+    if (use_gpu) {
+      if (_use_gpu_rec_onnx_session && _use_gpu_session_hash === modelHash) {
+        return _use_gpu_rec_onnx_session;
+      }
+      _use_gpu_rec_onnx_session = await create_onnx_session_fn(
+        ort,
+        modelArrayBuffer,
+        use_gpu
+      );
+      _use_gpu_session_hash = modelHash;
+      return _use_gpu_rec_onnx_session;
+    } else {
+      if (_use_cpu_rec_onnx_session && _use_cpu_session_hash === modelHash) {
+        return _use_cpu_rec_onnx_session;
+      }
+      _use_cpu_rec_onnx_session = await create_onnx_session_fn(
+        ort,
+        modelArrayBuffer,
+        use_gpu
+      );
+      _use_cpu_session_hash = modelHash;
+      return _use_cpu_rec_onnx_session;
     }
-    _rec_onnx_session = await create_onnx_session_fn(
-      ort,
-      modelArrayBuffer,
-      use_gpu
-    );
-    return _rec_onnx_session;
   }
 }

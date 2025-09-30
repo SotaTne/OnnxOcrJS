@@ -26,7 +26,10 @@ import {
 import ndarray, { type NdArray } from "ndarray";
 import ops from "ndarray-ops";
 
-let _cls_onnx_session: ORTSessionReturnType | undefined = undefined;
+let _use_gpu_cls_onnx_session: ORTSessionReturnType | undefined = undefined;
+let _use_gpu_session_hash: string | undefined = undefined;
+let _use_cpu_cls_onnx_session: ORTSessionReturnType | undefined = undefined;
+let _use_cpu_session_hash: string | undefined = undefined;
 
 export type TextClassifierParams = {
   cv: CV2;
@@ -35,7 +38,7 @@ export type TextClassifierParams = {
   label_list: LABEL_LIST | null;
   cls_batch_num: CLS_BATCH_NUM | null;
   ort: ORT;
-  det_model_array_buffer: ORTBufferType;
+  cls_model_array_buffer: ORTBufferType;
   use_gpu: USE_GCU;
 };
 
@@ -67,7 +70,7 @@ export class TextClassifier extends PredictBase {
     this.cls_thresh = params.cls_thresh ?? 0.9;
     this.cls_batch_num = params.cls_batch_num ?? 6;
     this.ort = params.ort;
-    this.cls_model_array_buffer = params.det_model_array_buffer;
+    this.cls_model_array_buffer = params.cls_model_array_buffer;
     this.use_gpu = params.use_gpu;
     this.postprocess_op = new ClsPostProcess({
       label_list: params.label_list,
@@ -79,7 +82,7 @@ export class TextClassifier extends PredictBase {
 
   static async create(params: TextClassifierParams) {
     const cls_onnx_session = await TextClassifier.get_onnx_session(
-      params.det_model_array_buffer,
+      params.cls_model_array_buffer,
       params.use_gpu,
       params.ort
     );
@@ -218,14 +221,30 @@ export class TextClassifier extends PredictBase {
     use_gpu: USE_GCU,
     ort: ORT
   ): Promise<ORTSessionReturnType> {
-    if (_cls_onnx_session) {
-      return _cls_onnx_session;
+    const modelHash = this.get_model_hash(modelArrayBuffer);
+
+    if (use_gpu) {
+      if (_use_gpu_cls_onnx_session && _use_gpu_session_hash === modelHash) {
+        return _use_gpu_cls_onnx_session;
+      }
+      _use_gpu_cls_onnx_session = await create_onnx_session_fn(
+        ort,
+        modelArrayBuffer,
+        use_gpu
+      );
+      _use_gpu_session_hash = modelHash;
+      return _use_gpu_cls_onnx_session;
+    } else {
+      if (_use_cpu_cls_onnx_session && _use_cpu_session_hash === modelHash) {
+        return _use_cpu_cls_onnx_session;
+      }
+      _use_cpu_cls_onnx_session = await create_onnx_session_fn(
+        ort,
+        modelArrayBuffer,
+        use_gpu
+      );
+      _use_cpu_session_hash = modelHash;
+      return _use_cpu_cls_onnx_session;
     }
-    _cls_onnx_session = await create_onnx_session_fn(
-      ort,
-      modelArrayBuffer,
-      use_gpu
-    );
-    return _cls_onnx_session;
   }
 }
