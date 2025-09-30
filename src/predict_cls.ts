@@ -8,7 +8,6 @@ import type {
   CLS_THRESH,
   LABEL_LIST,
   USE_GCU,
-  USE_SPACE_CHAR,
 } from "./types/paddle_types.js";
 import type {
   CV2,

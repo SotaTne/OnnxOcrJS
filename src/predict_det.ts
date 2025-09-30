@@ -30,7 +30,6 @@ import type {
   USE_GCU,
 } from "./types/paddle_types.js";
 import { PredictBase } from "./predict_base.js";
-import type { InferenceSession } from "onnxruntime-web";
 import { create_onnx_session_fn } from "./onnx_runtime.js";
 import {
   cloneNdArray,
