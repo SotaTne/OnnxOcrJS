@@ -95,6 +95,7 @@ export type E2E_PGNET_MODE = "fast" | "slow";
 export type USE_ANGLE_CLS = boolean;
 export type CLS_MODEL_DIR = `${string}.onnx`;
 export type CLS_IMAGE_SHAPE = string; // "3, 48, 192"形式
+export type CLS_IMAGE_SHAPE_NUMBER = number[]; // [3, 48, 192]
 export type LABEL_LIST = string[];
 export type CLS_BATCH_NUM = number;
 export type CLS_THRESH = number;

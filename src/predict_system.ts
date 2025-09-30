@@ -42,8 +42,8 @@ export class TextSystem {
     this.text_recognizer = params.text_recognizer;
     this.drop_score = params.drop_score ?? 0.7;
     this.use_angle_cls = params.use_angle_cls;
-    if (this.use_angle_cls) {
-      this.text_classifier = new TextClassifier(params);
+    if (this.use_angle_cls && params.text_classifier) {
+      this.text_classifier = params.text_classifier;
     }
     this.cv = params.cv;
   }
@@ -51,10 +51,22 @@ export class TextSystem {
   static async create(params: TextSystemParams) {
     const text_detector = await TextDetector.create(params);
     const text_recognizer = await TextRecognizer.create(params);
-    return new TextSystem({ ...params, text_detector, text_recognizer });
+    const text_classifier =
+      params.use_angle_cls && params.text_classifier
+        ? await TextClassifier.create(params)
+        : null;
+    return new TextSystem({
+      ...params,
+      text_detector,
+      text_recognizer,
+      text_classifier,
+    });
   }
 
-  async execute(img: Mat, cls = true): Promise<[Box[] | null, any[] | null]> {
+  async execute(
+    img: Mat,
+    cls = true
+  ): Promise<[Box[] | null, [string, number][] | null]> {
     const ori_img = img.clone();
 
     // 1. Detection
@@ -77,7 +89,7 @@ export class TextSystem {
       img_crop_list.push(img_crop);
     }
     if (this.use_angle_cls && cls && this.text_classifier) {
-      [img_crop_list] = this.text_classifier.execute(img_crop_list);
+      [img_crop_list] = await this.text_classifier.execute(img_crop_list);
     }
     const rec_res = await this.text_recognizer.execute(img_crop_list);
     // if (this.save_crop_res) {

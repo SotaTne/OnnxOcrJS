@@ -89,7 +89,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     // execute は is_remove_duplicate=true で decode する
     // -> 重複の 2 個目 (idx=1 の2つ目) は落ちる。残り [1,2,3] => "bcd"
     // conf は [0.9, 0.7, 0.6] の平均 = 2.2 / 3
-    const out = dec.execute(preds) as [string, number][];
+    const out = dec.execute(preds, null) as [string, number][];
     expect(out).toHaveLength(1);
     expect(out[0]![0]).toBe("bcd");
     expect(out[0]![1]).toBeCloseTo(2.2 / 3, 6);
