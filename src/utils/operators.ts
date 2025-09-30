@@ -72,6 +72,7 @@ export class NormalizeImage {
 
     // scaledImg - mean
     const subImg = ndarray(new Float32Array(row * col * channel), shape);
+
     ops.sub(subImg, scaledImg, broadcastTo(this.shapedMean, shape));
 
     // (scaledImg - mean) / std
@@ -82,7 +83,7 @@ export class NormalizeImage {
       row,
       col,
       channel === 1 ? this.cv.CV_32F : this.cv.CV_32FC3,
-      divImg
+      divImg.data
     );
     img.delete();
     return {
@@ -180,7 +181,7 @@ export class DetResizeForTest {
     const w = img.cols;
     const c = img.channels();
     const type = img.type();
-    const defaultIm = ndarray(Uint8Array.from(matToLine(img, this.cv).data), [
+    const defaultIm = ndarray(Float32Array.from(matToLine(img, this.cv).data), [
       h,
       w,
       c,

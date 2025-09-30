@@ -66,13 +66,13 @@ export class DBPostProcess {
   cv: CV2;
   constructor(params: DBPostProcessParams) {
     this.name = params.name;
-    this.thresh = params.thresh || 0.3;
-    this.box_thresh = params.box_thresh || 0.7;
-    this.max_candidates = params.max_candidates || 1000;
-    this.unclip_ratio = params.unclip_ratio || 2.0;
-    this.use_dilation = params.use_dilation || false;
-    this.score_mode = params.score_mode || "fast";
-    this.box_type = params.box_type || "quad";
+    this.thresh = params.thresh ?? 0.3;
+    this.box_thresh = params.box_thresh ?? 0.7;
+    this.max_candidates = params.max_candidates ?? 1000;
+    this.unclip_ratio = params.unclip_ratio ?? 2.0;
+    this.use_dilation = params.use_dilation ?? false;
+    this.score_mode = params.score_mode ?? "fast";
+    this.box_type = params.box_type ?? "quad";
     this.min_size = 3;
     this.cv = params.cv;
     if (this.use_dilation) {
@@ -87,9 +87,10 @@ export class DBPostProcess {
     const pred = outs_dict.maps;
     const pickedPred = pred.pick(-1, 0, -1, -1); // X*Y*Z*(1) [[[]]]
     const segmentationPred = ndarray(
-      new Uint8Array(pickedPred.size),
+      new Float32Array(pickedPred.size),
       pickedPred.shape
     );
+    console.log("pickedPred:", pickedPred);
     ops.gts(segmentationPred, pickedPred, this.thresh);
     // for batch_index in range(pred.shape[0]):
     if (typeof pred.shape[0] !== "number") {
@@ -102,18 +103,32 @@ export class DBPostProcess {
       throw new Error("pred.shape[0] and segmentationPred shape[0] mismatch");
     }
 
+    const li = (ndArrayToList(segmentationPred) as number[][][]).flat(
+      Infinity
+    ) as number[];
+    console.log("bigger");
+    for (let i = 0; i < li.length; i++) {
+      if (li[i]! > 0) {
+        console.log(li[i]);
+        console.log(i);
+      }
+    }
+    console.log("bigger end");
+
     const boxes_batch: {
       points: NdArray | number[][][];
     }[] = [];
     for (let batch_index = 0; batch_index < pred.shape[0]; batch_index++) {
       const [src_h, src_w, ratio_h, ratio_w] = shape_list[batch_index]!;
       const currentSegment = segmentationPred.pick(batch_index, -1, -1); // segmentationPred[batch_index]
+      console.log("currentSegment", currentSegment);
       const matSegment = this.cv.matFromArray(
         currentSegment.shape[0]!,
         currentSegment.shape[1]!,
         this.cv.CV_8UC1,
         (ndArrayToList(currentSegment) as number[][]).flat(Infinity) as number[]
       );
+      console.log("matSegment:", matSegment);
       const maskSegment = new this.cv.Mat();
       if (this.dilation_kernel !== null) {
         const kernel = this.cv.matFromArray(
@@ -145,8 +160,10 @@ export class DBPostProcess {
       } else {
         throw new Error(`Unknown box_type: ${this.box_type}`);
       }
+      console.log("boxes!:", boxes);
       boxes_batch.push({ points: boxes });
     }
+    console.log("boxes_batch:", boxes_batch);
     return boxes_batch;
   }
 
@@ -491,7 +508,7 @@ export class DBPostProcess {
     );
     const height = bitmap.shape[0]!;
     const width = bitmap.shape[1]!;
-    const flooredN0 = Math.floor(
+    const flooredN0 = Math.trunc(
       Math.min(
         ...((ndArrayToList(box.pick(-1, 0)) as number[][]).flat(
           Infinity
@@ -505,7 +522,7 @@ export class DBPostProcess {
         ) as number[])
       )
     );
-    const flooredN1 = Math.floor(
+    const flooredN1 = Math.trunc(
       Math.min(
         ...((ndArrayToList(box.pick(-1, 1)) as number[][]).flat(
           Infinity
@@ -583,7 +600,7 @@ export class DBPostProcess {
     const reshapedCounter = ndarray(counter.data, [counterShapeTotal / 2, 2]);
     const height = bitmap.shape[0]!;
     const width = bitmap.shape[1]!;
-    const flooredN0 = Math.floor(
+    const flooredN0 = Math.trunc(
       Math.min(
         ...((ndArrayToList(reshapedCounter.pick(-1, 0)) as number[][]).flat(
           Infinity
@@ -597,7 +614,7 @@ export class DBPostProcess {
         ) as number[])
       )
     );
-    const flooredN1 = Math.floor(
+    const flooredN1 = Math.trunc(
       Math.min(
         ...((ndArrayToList(reshapedCounter.pick(-1, 1)) as number[][]).flat(
           Infinity

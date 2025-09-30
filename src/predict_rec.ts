@@ -175,7 +175,7 @@ export class TextRecognizer extends PredictBase {
         `input image channels ${img.channels()} must be equal to rec_image_shape ${imgC}`
       );
     }
-    imgW = Math.floor(imgH * max_hw_ratio);
+    imgW = Math.trunc(imgH * max_hw_ratio);
     const h = img.rows;
     const w = img.cols;
     const ratio = w / h;
@@ -183,7 +183,7 @@ export class TextRecognizer extends PredictBase {
     if (resized_w > imgW) {
       resized_w = imgW;
     } else {
-      resized_w = Math.floor(resized_w);
+      resized_w = Math.trunc(resized_w);
     }
 
     if (this.rec_algorithm === "RARE") {

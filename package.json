@@ -16,6 +16,7 @@
     "@techstark/opencv-js": "4.11.0-release.1",
     "@types/ndarray": "^1.0.14",
     "@types/ndarray-ops": "^1.2.7",
+    "jimp": "^1.6.0",
     "onnxruntime-node": "^1.23.0",
     "onnxruntime-react-native": "^1.23.0",
     "onnxruntime-web": "^1.23.0",

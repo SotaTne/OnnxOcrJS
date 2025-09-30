@@ -170,8 +170,8 @@ export class TextDetector extends PredictBase {
   clip_det_res(points: Point[], img_height: number, img_width: number) {
     let new_points = [...points];
     for (let p of new_points) {
-      p[0] = Math.floor(Math.min(Math.max(p[0], 0), img_width - 1));
-      p[1] = Math.floor(Math.min(Math.max(p[1], 0), img_height - 1));
+      p[0] = Math.trunc(Math.min(Math.max(p[0], 0), img_width - 1));
+      p[1] = Math.trunc(Math.min(Math.max(p[1], 0), img_height - 1));
     }
     return new_points;
   }
@@ -182,10 +182,10 @@ export class TextDetector extends PredictBase {
     for (const box of dt_boxes) {
       let box_new = this.order_points_clockwise(box);
       box_new = this.clip_det_res(box_new, img_height!, img_width!);
-      const rect_width = Math.floor(
+      const rect_width = Math.trunc(
         euclideanDistance(box_new[0]!, box_new[1]!)
       );
-      const rect_height = Math.floor(
+      const rect_height = Math.trunc(
         euclideanDistance(box_new[0]!, box_new[3]!)
       );
       if (rect_width <= 3 || rect_height <= 3) {
@@ -234,13 +234,17 @@ export class TextDetector extends PredictBase {
       ort_run_fetches
     );
 
-    const result_preds = outputs[0];
+    const result_preds = outputs[ort_run_fetches[0]!];
 
     if (!result_preds) {
       throw new Error("No output from the model");
     }
     const preds: OutDict = { maps: tensorToNdArray(result_preds) };
+
+    console.log("preds:", preds);
     const post_shape_list = shape_list ? [shape_list] : [];
+
+    console.log("post_shape_list:", post_shape_list);
 
     const post_result = await this.postprocess_op.execute(
       preds,
@@ -248,6 +252,8 @@ export class TextDetector extends PredictBase {
     );
 
     const dt_boxes = post_result[0]!["points"];
+
+    console.log("dt_boxes:", dt_boxes);
 
     const dt_boxes_array = (
       Array.isArray(dt_boxes)

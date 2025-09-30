@@ -1,5 +1,5 @@
 // rec_postprocess.spec.ts
-import { describe, expect, test } from "vitest";
+import { describe, expect, it } from "vitest";
 import { CTCLabelDecode } from "./rec_postprocess.js";
 
 /**
@@ -23,7 +23,7 @@ function makePreds(
 }
 
 describe("CTCLabelDecode / BaseRecLabelDecode", () => {
-  test("decode: 重複除去 + 無視トークン(0) を適用し、平均信頼度を返す", () => {
+  it("decode: 重複除去 + 無視トークン(0) を適用し、平均信頼度を返す", () => {
     // 使う文字集合を小さくして可読性を上げる
     const dec = new CTCLabelDecode({
       character_str: "abcd",
@@ -44,7 +44,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     expect(out[0]![1]).toBeCloseTo(2.2 / 3, 6);
   });
 
-  test("decode: すべて無視トークン(0) の場合は空文字 & 信頼度0", () => {
+  it("decode: すべて無視トークン(0) の場合は空文字 & 信頼度0", () => {
     const dec = new CTCLabelDecode({
       character_str: "abcd",
       use_space_char: false,
@@ -53,7 +53,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     expect(out).toEqual([["", 0]]);
   });
 
-  test("decode: use_space_char=true で末尾に空白が追加される（index=2）", () => {
+  it("decode: use_space_char=true で末尾に空白が追加される（index=2）", () => {
     const dec = new CTCLabelDecode({
       character_str: "ab",
       use_space_char: true,
@@ -64,7 +64,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     expect(out).toEqual([["b ", 1]]); // text_prob=null なので conf は 1 の平均
   });
 
-  test("pred_reverse: 記号で分割し、英数塊をまとめて逆順に並べ替える", () => {
+  it("pred_reverse: 記号で分割し、英数塊をまとめて逆順に並べ替える", () => {
     const dec = new CTCLabelDecode({
       character_str: "abcd",
       use_space_char: false,
@@ -75,7 +75,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     expect(reversed).toBe("def 12/34☆abc");
   });
 
-  test("execute: label なし → [ [text, conf] ] を返す", () => {
+  it("execute: label なし → [ [text, conf] ] を返す", () => {
     const dec = new CTCLabelDecode({
       character_str: "abcd",
       use_space_char: false,
@@ -95,7 +95,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     expect(out[0]![1]).toBeCloseTo(2.2 / 3, 6);
   });
 
-  test("execute: label あり → [ [ [text, conf] ], [ [labelText, 1] ] ] を返す", () => {
+  it("execute: label あり → [ [ [text, conf] ], [ [labelText, 1] ] ] を返す", () => {
     const dec = new CTCLabelDecode({
       character_str: "abcd",
       use_space_char: false,
@@ -124,7 +124,7 @@ describe("CTCLabelDecode / BaseRecLabelDecode", () => {
     expect(out[1][0]![1]).toBe(1);
   });
 
-  test("decode: 複数バッチも処理できる", () => {
+  it("decode: 複数バッチも処理できる", () => {
     const dec = new CTCLabelDecode({
       character_str: "wxyz",
       use_space_char: false,
