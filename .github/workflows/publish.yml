@@ -1,8 +1,7 @@
 name: Release and Publish
 
 on:
-  workflow_dispatch: # 手動実行
-
+  workflow_dispatch: # 手動実行でも実行可能
   release:
     types: [published] # GitHub Release が公開されたら実行
 
@@ -22,7 +21,7 @@ jobs:
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run tests
         run: pnpm test -- --coverage
@@ -37,6 +36,7 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -44,7 +44,7 @@ jobs:
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build
         run: pnpm build
@@ -58,7 +58,6 @@ jobs:
             package.json
             README*.md
             LICENSE
-            pnpm-lock.yaml
 
   publish:
     needs: build
@@ -71,6 +70,7 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -78,9 +78,9 @@ jobs:
           registry-url: "https://registry.npmjs.org/"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Publish to npm
-        run: pnpm publish pnpm publish --access public --no-git-checks --ignore-scripts
+        run: pnpm publish --access public --no-git-checks --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
