@@ -108,7 +108,26 @@ console.log(results);
 </script>
 ```
 
----
+### How to Get Models
+
+This library uses PaddleOCR-compatible ONNX models for OCR inference.  
+
+- Sample models are included in this repository under the [`/models`](./models) directory.  
+- You can also obtain official converted models from the OnnxOCR GitHub repository:  
+  👉 [OnnxOCR/models](https://github.com/jingsongliujing/OnnxOCR/tree/main/onnxocr/models)
+
+⚠️ Since model files are large, they are **not included in the npm package**.  
+Please download them manually as needed.
+
+#### Example: Downloading individual files
+
+```bash
+# Using curl
+curl -L https://raw.githubusercontent.com/SotaTne/OnnxOcrJS/main/models/ppocrv5/det/det.onnx -o det.onnx
+
+# Using wget
+wget https://raw.githubusercontent.com/SotaTne/OnnxOcrJS/main/models/ppocrv5/det/det.onnx -O det.onnx
+```
 
 ## Notes
 
@@ -126,4 +145,4 @@ console.log(results);
   - This library: **Apache-2.0**  
   - Models and algorithms follow their original projects:  
     - [PaddleOCR (Apache-2.0)](https://github.com/PaddlePaddle/PaddleOCR)  
-    - [ONNXOCR (Apache-2.0)](https://github.com/kyamagu/onnxocr)  
+    - [ONNXOCR (Apache-2.0)](https://github.com/jingsongliujing/OnnxOCR)  

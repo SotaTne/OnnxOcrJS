@@ -121,6 +121,26 @@ console.log(results);
 
 ---
 
+### モデルの入手方法
+
+本ライブラリは OCR の推論に PaddleOCR 互換の ONNX モデルを利用します。  
+
+- サンプルモデルはこのリポジトリの [`/models`](./models) ディレクトリに含まれています。  
+- また、公式変換済みモデルは OnnxOCR の GitHub リポジトリからも入手できます:  
+  👉 [OnnxOCR/models](https://github.com/jingsongliujing/OnnxOCR/tree/main/onnxocr/models)
+
+⚠️ モデルはサイズが大きいため、npm パッケージには含まれていません。必要に応じて手動で取得してください。
+
+#### 個別ファイルのダウンロード例
+
+```bash
+# curl の場合
+curl -L https://raw.githubusercontent.com/SotaTne/OnnxOcrJS/main/models/ppocrv5/det/det.onnx -o det.onnx
+
+# wget の場合
+wget https://raw.githubusercontent.com/SotaTne/OnnxOcrJS/main/models/ppocrv5/det/det.onnx -O det.onnx
+```
+
 ## 注意事項
 
 - **ONNX Runtime**:  
@@ -137,4 +157,4 @@ console.log(results);
   本ライブラリのライセンスは **Apache-2.0** です。  
   ただしアルゴリズムやモデルはそれぞれ以下のライセンスに従います:  
   - [PaddleOCR (Apache-2.0)](https://github.com/PaddlePaddle/PaddleOCR)  
-  - [ONNXOCR (Apache-2.0)](https://github.com/kyamagu/onnxocr)
+  - [ONNXOCR (Apache-2.0)](https://github.com/jingsongliujing/OnnxOCR)

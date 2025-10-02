@@ -110,6 +110,27 @@ console.log(results);
 
 ---
 
+### 模型获取方法
+
+本库在 OCR 推理中使用 PaddleOCR 兼容的 ONNX 模型。  
+
+- 示例模型已包含在本仓库的 [`/models`](./models) 目录下。  
+- 你也可以从 OnnxOCR 的 GitHub 仓库获取官方转换的模型：  
+  👉 [OnnxOCR/models](https://github.com/jingsongliujing/OnnxOCR/tree/main/onnxocr/models)
+
+⚠️ 由于模型文件体积较大，**npm 包中未包含模型**。  
+请根据需要手动下载。
+
+#### 单个文件下载示例
+
+```bash
+# 使用 curl
+curl -L https://raw.githubusercontent.com/SotaTne/OnnxOcrJS/main/models/ppocrv5/det/det.onnx -o det.onnx
+
+# 使用 wget
+wget https://raw.githubusercontent.com/SotaTne/OnnxOcrJS/main/models/ppocrv5/det/det.onnx -O det.onnx
+```
+
 ## 注意事项
 
 - **ONNX Runtime**:  
@@ -126,4 +147,4 @@ console.log(results);
   - 本库: **Apache-2.0**  
   - 模型与算法遵循原项目的许可证:  
     - [PaddleOCR (Apache-2.0)](https://github.com/PaddlePaddle/PaddleOCR)  
-    - [ONNXOCR (Apache-2.0)](https://github.com/kyamagu/onnxocr)  
+    - [ONNXOCR (Apache-2.0)](https://github.com/jingsongliujing/OnnxOCR)  

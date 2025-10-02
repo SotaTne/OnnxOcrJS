@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -26,10 +28,12 @@ jobs:
         run: pnpm test
 
   build:
-    needs: test # test が成功したら実行
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -46,17 +50,24 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Upload dist artifact
+      - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: package
+          path: |
+            dist/
+            package.json
+            README*.md
+            LICENSE
 
   publish:
-    needs: build # build が成功したら実行
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: .
 
       - uses: actions/setup-node@v4
         with:
@@ -70,13 +81,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Download dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-
       - name: Publish to npm
-        run: pnpm publish --access public
+        run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

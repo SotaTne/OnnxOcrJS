@@ -1,6 +1,7 @@
 name: test
 
 on:
+  workflow_dispatch: # 手動実行
   push:
     branches:
       - main
@@ -18,6 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,4 +34,4 @@ jobs:
         run: pnpm install
 
       - name: Run tests
-        run: pnpm test
+        run: pnpm test -- --coverage
