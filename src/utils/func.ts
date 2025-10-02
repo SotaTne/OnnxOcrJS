@@ -3,7 +3,8 @@ import type { Box, CV2, ORTTensorType, Point } from "../types/type.js";
 import type { NdArray } from "ndarray";
 import ndarray from "ndarray";
 import ops from "ndarray-ops";
-import * as clipperLib from "js-angusj-clipper";
+/// @ts-ignore
+import * as clipperLib from "js-angusj-clipper/web"; // es6 / typescript
 
 export function euclideanDistance(point1: Point, point2: Point): number {
   return Math.sqrt(

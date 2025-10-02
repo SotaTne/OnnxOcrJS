@@ -50,6 +50,8 @@
     "examples",
     "*.spec.ts",
     "*.test.ts",
-    "example"
+    "example",
+    "e2e",
+    "playwright.config.ts"
   ]
 }

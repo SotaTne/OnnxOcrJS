@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>OnnxOcrJS Web Demo</title>
+</head>
+<body>
+  <h1>OnnxOcrJS Web Demo</h1>
+
+  <div>
+    <label for="imageInput">画像をアップロードしてください</label>
+    <p><input type="file" id="imageInput" accept="image/*"></p>
+  </div>
+
+  <button id="ocrBtn" disabled>OCR 実行</button>
+  <p id="status">Loading...</p>
+  <pre id="result"></pre>
+
+  <!-- OpenCV.js -->
+  <script src="https://docs.opencv.org/4.11.0/opencv.js"></script>
+  <!-- ONNX Runtime Web -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+  <script type="module">
+    "use strict";
+
+    import { ONNXPaddleOCR } from "https://esm.sh/onnx-ocr-js@0.0.1";
+
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    const imageInput = document.getElementById("imageInput");
+    const ocrBtn = document.getElementById("ocrBtn");
+
+    let textSystem = null;
+    let ocr = null;
+
+    async function initOCR(cv2) {
+      status.textContent = "Loading models...";
+
+      const [detModel, recModel, clsModel, charset] = await Promise.all([
+        fetch("models/ppocrv5/det/det.onnx").then(r => r.arrayBuffer()).then(b => new Uint8Array(b)),
+        fetch("models/ppocrv5/rec/rec.onnx").then(r => r.arrayBuffer()).then(b => new Uint8Array(b)),
+        fetch("models/ppocrv5/cls/cls.onnx").then(r => r.arrayBuffer()).then(b => new Uint8Array(b)),
+        fetch("models/ppocrv5/ppocrv5_dict.txt").then(r => r.text())
+      ]);
+
+      ocr = new ONNXPaddleOCR({ use_angle_cls: true });
+      textSystem = await ocr.init({
+        cv: cv2,
+        ort,
+        det_model_array_buffer: detModel,
+        rec_model_array_buffer: recModel,
+        cls_model_array_buffer: clsModel,
+        rec_char_dict: charset
+      });
+
+      status.textContent = "✅ Ready!";
+      ocrBtn.disabled = false;
+    }
+    // OpenCVがPromiseの場合のハンドリング
+    let cvPromise;
+    if (cv instanceof Promise) {
+      cvPromise = cv;
+    } else {
+      cvPromise = Promise.resolve(cv);
+    }
+
+    cvPromise.then(async (cv2) => {
+      await initOCR(cv2);
+
+      ocrBtn.addEventListener("click", async () => {
+        if (!imageInput.files[0]) {
+          alert("画像を選択してください");
+          return;
+        }
+
+        const img = new Image();
+        img.src = URL.createObjectURL(imageInput.files[0]);
+        img.onload = async () => {
+          // cv2.imread を使う
+          const mat = cv2.imread(img);
+          const mat3ch = new cv2.Mat();
+          cv2.cvtColor(mat, mat3ch, cv2.COLOR_RGBA2BGR);
+
+          status.textContent = "Running OCR...";
+          const results = await ocr.ocr(textSystem, mat3ch, true, true, true);
+          result.textContent = JSON.stringify(results, null, 2);
+          status.textContent = "✅ Done.";
+
+          mat.delete();
+          mat3ch.delete();
+        };
+      });
+    });
+  </script>
+</body>
+</html>
