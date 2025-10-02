@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "test:vite": "vitest",
+    "test": "vitest",
     "test:playwright": "pnpm exec playwright test",
     "build:types": "tsc -p tsconfig.build.json",
     "build:bundle": "node esbuild.config.mjs",
