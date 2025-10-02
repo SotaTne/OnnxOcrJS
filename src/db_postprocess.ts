@@ -90,7 +90,7 @@ export class DBPostProcess {
       new Float32Array(pickedPred.size),
       pickedPred.shape
     );
-    console.log("pickedPred:", pickedPred);
+    // console.log("pickedPred:", pickedPred);
     ops.gts(segmentationPred, pickedPred, this.thresh);
     // for batch_index in range(pred.shape[0]):
     if (typeof pred.shape[0] !== "number") {
@@ -106,14 +106,14 @@ export class DBPostProcess {
     const li = (ndArrayToList(segmentationPred) as number[][][]).flat(
       Infinity
     ) as number[];
-    console.log("bigger");
+    // console.log("bigger");
     for (let i = 0; i < li.length; i++) {
       if (li[i]! > 0) {
-        console.log(li[i]);
-        console.log(i);
+        // console.log(li[i]);
+        // console.log(i);
       }
     }
-    console.log("bigger end");
+    // console.log("bigger end");
 
     const boxes_batch: {
       points: NdArray | number[][][];
@@ -121,14 +121,14 @@ export class DBPostProcess {
     for (let batch_index = 0; batch_index < pred.shape[0]; batch_index++) {
       const [src_h, src_w, ratio_h, ratio_w] = shape_list[batch_index]!;
       const currentSegment = segmentationPred.pick(batch_index, -1, -1); // segmentationPred[batch_index]
-      console.log("currentSegment", currentSegment);
+      // console.log("currentSegment", currentSegment);
       const matSegment = this.cv.matFromArray(
         currentSegment.shape[0]!,
         currentSegment.shape[1]!,
         this.cv.CV_8UC1,
         (ndArrayToList(currentSegment) as number[][]).flat(Infinity) as number[]
       );
-      console.log("matSegment:", matSegment);
+      // console.log("matSegment:", matSegment);
       const maskSegment = new this.cv.Mat();
       if (this.dilation_kernel !== null) {
         const kernel = this.cv.matFromArray(
@@ -160,10 +160,10 @@ export class DBPostProcess {
       } else {
         throw new Error(`Unknown box_type: ${this.box_type}`);
       }
-      console.log("boxes!:", boxes);
+      // console.log("boxes!:", boxes);
       boxes_batch.push({ points: boxes });
     }
-    console.log("boxes_batch:", boxes_batch);
+    // console.log("boxes_batch:", boxes_batch);
     return boxes_batch;
   }
 
@@ -661,11 +661,17 @@ export class DBPostProcess {
       -1,
       1
     );
-
-    const counterCV = ndArrayToMat(pikedN1, this.cv).reshape(-1, 1, 2);
+    const pickedArray = (ndArrayToList(pikedN1) as number[][]).flat();
+    const counterCV = this.cv.matFromArray(
+      pikedN1.shape[0]!,
+      1,
+      this.cv.CV_32SC2,
+      Int32Array.from(pickedArray as number[])
+    ); //(-1,1,2)
     const vectorBoxCV = new this.cv.MatVector();
     vectorBoxCV.push_back(counterCV);
-    this.cv.fillPoly(maskCV, vectorBoxCV, 1);
+    const color = new this.cv.Scalar(1, 1, 1, 1);
+    this.cv.fillPoly(maskCV, vectorBoxCV, color);
     const clonedBitmap = cloneNdArray(bitmap);
     const picked = clonedBitmap.hi(ymax + 1, xmax + 1).lo(ymin, xmin);
     return this.cv.mean(ndArrayToMat(picked, this.cv), maskCV)[0]!;

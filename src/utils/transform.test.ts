@@ -391,11 +391,11 @@ describe("transform", () => {
     // 0〜255 を繰り返す flat リスト
     const flat: number[] = new Array(size).fill(0).map((_, i) => i % 256);
 
-    console.log(flat);
+    // console.log(flat);
 
     const img = cv.matFromArray(640, 640, cv.CV_8UC3, Uint8Array.from(flat));
 
-    console.log(matToLine(img, cv));
+    // console.log(matToLine(img, cv));
 
     const inputs = {
       image: img,

@@ -63,7 +63,7 @@ export class TextRecognizer extends PredictBase {
   constructor(
     params: TextRecognizerParams & {
       rec_onnx_session: ORTSessionReturnType;
-    }
+    },
   ) {
     super();
     this.cv = params.cv;
@@ -85,7 +85,7 @@ export class TextRecognizer extends PredictBase {
     const rec_onnx_session = await TextRecognizer.get_onnx_session(
       params.rec_model_array_buffer,
       params.use_gpu,
-      params.ort
+      params.ort,
     );
     return new TextRecognizer({ ...params, rec_onnx_session });
   }
@@ -101,7 +101,7 @@ export class TextRecognizer extends PredictBase {
         img.rows,
         img.cols,
         this.cv.CV_8UC1,
-        matToLine(det_cvt, this.cv).data
+        matToLine(det_cvt, this.cv).data,
       );
       const det_resized_img = new this.cv.Mat();
       if (this.rec_algorithm === "ViTSTR") {
@@ -111,7 +111,7 @@ export class TextRecognizer extends PredictBase {
           new this.cv.Size(imgW, imgH),
           0,
           0,
-          this.cv.INTER_CUBIC
+          this.cv.INTER_CUBIC,
         );
       } else {
         this.cv.resize(
@@ -120,13 +120,21 @@ export class TextRecognizer extends PredictBase {
           new this.cv.Size(imgW, imgH),
           0,
           0,
-          this.cv.INTER_LANCZOS4
+          this.cv.INTER_LANCZOS4,
         );
       }
-      const ndarray_img = matToNdArray(det_resized_img, this.cv);
-      const img_3c_list = (
-        ndArrayToList(cloneNdArray(ndarray_img)) as number[][][]
-      ).map((row) => row.map((col) => [col[0]!, col[0]!, col[0]!]));
+      const det_resized_3c_img = new this.cv.Mat();
+      this.cv.cvtColor(
+        det_resized_img,
+        det_resized_3c_img,
+        this.cv.COLOR_GRAY2BGR,
+      );
+
+      const ndarray_img = matToNdArray(det_resized_3c_img, this.cv);
+
+      const img_3c_list = ndArrayToList(
+        cloneNdArray(ndarray_img),
+      ) as number[][][];
       const ndarray_img_3c = ndarray(Float32Array.from(img_3c_list.flat(2)), [
         ndarray_img.shape[0]!,
         ndarray_img.shape[1]!,
@@ -138,7 +146,7 @@ export class TextRecognizer extends PredictBase {
         this.rec_algorithm === "ViTSTR"
           ? list_img.map((row) => row.map((col) => col.map((v) => v / 255.0)))
           : list_img.map((row) =>
-              row.map((col) => col.map((v) => v / 128.0 - 1.0))
+              row.map((col) => col.map((v) => v / 128.0 - 1.0)),
             );
       // (3,H,W)
       return norm_img;
@@ -152,12 +160,18 @@ export class TextRecognizer extends PredictBase {
         new this.cv.Size(imgW, imgH),
         0,
         0,
-        this.cv.INTER_CUBIC
+        this.cv.INTER_CUBIC,
       );
-      const ndarray_img = matToNdArray(det_resized_img, this.cv);
-      const img_3c_list = (
-        ndArrayToList(cloneNdArray(ndarray_img)) as number[][][]
-      ).map((row) => row.map((col) => [col[0]!, col[0]!, col[0]!]));
+      const det_resized_3c_img = new this.cv.Mat();
+      this.cv.cvtColor(
+        det_resized_img,
+        det_resized_3c_img,
+        this.cv.COLOR_GRAY2BGR,
+      );
+      const ndarray_img = matToNdArray(det_resized_3c_img, this.cv);
+      const img_3c_list = ndArrayToList(
+        cloneNdArray(ndarray_img),
+      ) as number[][][];
       const ndarray_img_3c = ndarray(Float32Array.from(img_3c_list.flat(2)), [
         ndarray_img.shape[0]!,
         ndarray_img.shape[1]!,
@@ -166,18 +180,23 @@ export class TextRecognizer extends PredictBase {
       const transposed = ndarray_img_3c.transpose(2, 0, 1); // (3,H,W)
       const list_img = ndArrayToList(transposed) as number[][][];
       const norm_img = list_img.map((row) =>
-        row.map((col) => col.map((v) => (v / 255.0 - 0.5) / 0.5))
+        row.map((col) => col.map((v) => (v / 255.0 - 0.5) / 0.5)),
       );
       return norm_img;
     }
     if (imgC !== img.channels()) {
       throw new Error(
-        `input image channels ${img.channels()} must be equal to rec_image_shape ${imgC}`
+        `input image channels ${img.channels()} must be equal to rec_image_shape ${imgC}`,
       );
     }
+
+    // 🔴 BGR → RGB
+    const rgb = new this.cv.Mat();
+    this.cv.cvtColor(img, rgb, this.cv.COLOR_BGR2RGB);
+
     imgW = Math.trunc(imgH * max_hw_ratio);
-    const h = img.rows;
-    const w = img.cols;
+    const h = rgb.rows;
+    const w = rgb.cols;
     const ratio = w / h;
     let resized_w = Math.ceil(imgH * ratio);
     if (resized_w > imgW) {
@@ -192,24 +211,32 @@ export class TextRecognizer extends PredictBase {
       }
       imgW = this.rec_image_shape[2]!;
     }
+
     const resized_img = new this.cv.Mat();
-    this.cv.resize(img, resized_img, new this.cv.Size(resized_w, imgH), 0, 0);
+    this.cv.resize(rgb, resized_img, new this.cv.Size(resized_w, imgH), 0, 0);
     const ndarray_img = matToNdArray(resized_img, this.cv);
     const transposed = ndarray_img.transpose(2, 0, 1); // (3,H,W)
 
+    const transposed_list = (ndArrayToList(transposed) as number[][][]).flat(2);
+    const norm_transposed_list = transposed_list.map(
+      (v) => (v / 255.0 - 0.5) / 0.5,
+    );
+
+    const transposed_ndarray = ndarray(
+      Float32Array.from(norm_transposed_list),
+      transposed.shape,
+    );
+
     const zeroImg = ndarray(
       Float32Array.from(Array(imgC * imgH * imgW).fill(0)),
-      [imgC, imgH, imgW]
+      [imgC, imgH, imgW],
     );
 
     const zeroView = zeroImg.hi(imgC, imgH, resized_w);
 
-    ops.assign(zeroView, transposed.hi(imgC, imgH, resized_w));
+    ops.assign(zeroView, transposed_ndarray.hi(imgC, imgH, resized_w));
 
-    const list_img = ndArrayToList(zeroView) as number[][][]; // [C,H,W]
-    const norm_img = list_img.map((row) =>
-      row.map((col) => col.map((v) => (v / 255.0 - 0.5) / 0.5))
-    );
+    const norm_img = ndArrayToList(zeroImg) as number[][][]; // [C,H,W]
     return norm_img;
   }
 
@@ -260,7 +287,7 @@ export class TextRecognizer extends PredictBase {
       for (let ino = beg_img_no; ino < end_img_no; ino++) {
         const norm_img = this.resize_norm_img(
           img_list[indices[ino]!]!,
-          max_wh_ratio
+          max_wh_ratio,
         );
         norm_img_batch.push(norm_img);
       }
@@ -269,7 +296,7 @@ export class TextRecognizer extends PredictBase {
       const tensor_imgs = new this.ort.Tensor(
         "float32",
         img_buffer,
-        images_shape
+        images_shape,
       );
 
       const input_feed = this.get_input_feed(this.rec_input_name, tensor_imgs);
@@ -277,10 +304,10 @@ export class TextRecognizer extends PredictBase {
 
       const outputs = await this.rec_onnx_session.run(
         input_feed,
-        ort_run_fetches
+        ort_run_fetches,
       );
 
-      const result_preds = outputs[0];
+      const result_preds = outputs[this.rec_output_name[0]!];
 
       if (!result_preds) {
         throw new Error("No output from the model");
@@ -302,7 +329,7 @@ export class TextRecognizer extends PredictBase {
   static async get_onnx_session(
     modelArrayBuffer: ORTBufferType,
     use_gpu: USE_GCU,
-    ort: ORT
+    ort: ORT,
   ): Promise<ORTSessionReturnType> {
     const modelHash = this.get_model_hash(modelArrayBuffer);
     if (use_gpu) {
@@ -312,7 +339,7 @@ export class TextRecognizer extends PredictBase {
       _use_gpu_rec_onnx_session = await create_onnx_session_fn(
         ort,
         modelArrayBuffer,
-        use_gpu
+        use_gpu,
       );
       _use_gpu_session_hash = modelHash;
       return _use_gpu_rec_onnx_session;
@@ -323,7 +350,7 @@ export class TextRecognizer extends PredictBase {
       _use_cpu_rec_onnx_session = await create_onnx_session_fn(
         ort,
         modelArrayBuffer,
-        use_gpu
+        use_gpu,
       );
       _use_cpu_session_hash = modelHash;
       return _use_cpu_rec_onnx_session;

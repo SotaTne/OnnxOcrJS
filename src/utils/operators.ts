@@ -79,11 +79,17 @@ export class NormalizeImage {
     const divImg = ndarray(new Float32Array(row * col * channel), shape);
     ops.div(divImg, subImg, broadcastTo(this.shapedStd, shape));
 
+    if (channel !== 1 && channel !== 3) {
+      throw new Error(
+        `NormalizeImage: unsupported channel size ${channel}, only 1 or 3 is supported`,
+      );
+    }
+
     const normalizedImg = this.cv.matFromArray(
       row,
       col,
       channel === 1 ? this.cv.CV_32F : this.cv.CV_32FC3,
-      divImg.data
+      divImg.data,
     );
     img.delete();
     return {
@@ -189,13 +195,13 @@ export class DetResizeForTest {
     const im_pad = fillValue(
       defaultIm,
       [Math.max(32, h), Math.max(32, w), c],
-      value
+      value,
     );
     const paddedImg = this.cv.matFromArray(
       Math.max(32, h),
       Math.max(32, w),
       type,
-      im_pad.data
+      im_pad.data,
     );
     return paddedImg;
   }
@@ -219,7 +225,7 @@ export class DetResizeForTest {
     this.cv.resize(
       img,
       resizedImg,
-      new this.cv.Size(Math.trunc(resize_w), Math.trunc(resize_h))
+      new this.cv.Size(Math.trunc(resize_w), Math.trunc(resize_h)),
     );
     return { img: resizedImg, ratio_h, ratio_w };
   }
@@ -258,11 +264,11 @@ export class DetResizeForTest {
 
     const resize_h = Math.max(
       Math.trunc(Math.round(resize_h_tmp / 32) * 32),
-      32
+      32,
     );
     const resize_w = Math.max(
       Math.trunc(Math.round(resize_w_tmp / 32) * 32),
-      32
+      32,
     );
 
     const resized_img = new this.cv.Mat();
@@ -272,7 +278,7 @@ export class DetResizeForTest {
       throw new Error(
         `DetResizeForTest: cv.resize failed. resize_w: ${resize_w}, resize_h: ${resize_h}, img.cols: ${
           img.cols
-        }, img.rows: ${img.rows}, img.type(): ${img.type()}`
+        }, img.rows: ${img.rows}, img.type(): ${img.type()}`,
       );
     }
     const ratio_h = resize_h / h;
@@ -398,7 +404,7 @@ export type PreProcessOperator =
 
 export function transform(
   data: Data,
-  ops: PreProcessOperator[]
+  ops: PreProcessOperator[],
 ): Data | DataValues[] | null {
   if (ops.length === 0) {
     return data;

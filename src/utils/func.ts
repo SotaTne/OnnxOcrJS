@@ -7,12 +7,12 @@ import * as clipperLib from "js-angusj-clipper";
 
 export function euclideanDistance(point1: Point, point2: Point): number {
   return Math.sqrt(
-    Math.pow(point1[0] - point2[0], 2) + Math.pow(point1[1] - point2[1], 2)
+    Math.pow(point1[0] - point2[0], 2) + Math.pow(point1[1] - point2[1], 2),
   );
 }
 
 export function boxToLine(
-  box: Box
+  box: Box,
 ): [number, number, number, number, number, number, number, number] {
   const [p1, p2, p3, p4] = box;
   return [p1[0], p1[1], p2[0], p2[1], p3[0], p3[1], p4[0], p4[1]];
@@ -90,7 +90,7 @@ export function matToArrayBuffer(mat: Mat, cv: CV2) {
 
 export function matToLine(
   mat: Mat,
-  cv: CV2
+  cv: CV2,
 ): { data: number[]; col: number; row: number; channel: number } {
   const data = matToArrayBuffer(mat, cv);
   if (
@@ -104,7 +104,7 @@ export function matToLine(
       data instanceof Float64Array
     )
   ) {
-    console.log(data);
+    // console.log(data);
     throw new Error("matToLine: unsupported Mat type");
   }
   const array = Array.from(data);
@@ -115,7 +115,7 @@ export function matToLine(
     throw new Error(
       `matToLine: data length mismatch\n  expected: ${col} * ${row} * ${channel} = ${
         col * row * channel
-      }\n  actual: ${array.length}`
+      }\n  actual: ${array.length}`,
     );
   }
   return { data: array, col: col, row: row, channel: channel };
@@ -124,7 +124,7 @@ export function matToLine(
 export function matToList(
   mat: Mat,
   cv: CV2,
-  minCol = true
+  minCol = true,
 ): number[][] | number[][][] {
   const { data, col, row, channel } = matToLine(mat, cv);
 
@@ -143,7 +143,7 @@ export function shapeAndDataToList(
     channel: number;
     data: number[];
   },
-  minCol = true
+  minCol = true,
 ): number[][] | number[][][] {
   if (minCol && col === 1) {
     const list: number[][] = [];
@@ -175,98 +175,6 @@ export function shapeAndDataToList(
   }
 }
 
-export function get_rotate_crop_image(img: Mat, points: Box, cv: CV2): Mat {
-  if (points.length !== 4) {
-    throw new Error("shape of points must be 4*2");
-  }
-  const img_crop_width = Math.trunc(
-    Math.max(
-      euclideanDistance(points[0], points[1]),
-      euclideanDistance(points[2], points[3])
-    )
-  );
-  const img_crop_height = Math.trunc(
-    Math.max(
-      euclideanDistance(points[0], points[3]),
-      euclideanDistance(points[1], points[2])
-    )
-  );
-
-  const pts_std: Box = [
-    [0, 0],
-    [img_crop_width, 0],
-    [img_crop_width, img_crop_height],
-    [0, img_crop_height],
-  ];
-
-  const srcTri = boxToMat(points, cv);
-  const dstTri = boxToMat(pts_std, cv);
-
-  const M = cv.getPerspectiveTransform(srcTri, dstTri);
-  const dst_img = new cv.Mat();
-  cv.warpPerspective(
-    img,
-    dst_img,
-    M,
-    new cv.Size(img_crop_width, img_crop_height),
-    cv.BORDER_REPLICATE,
-    cv.INTER_CUBIC
-  );
-  const imgSize = dst_img.size();
-  if ((imgSize.height * 1.0) / imgSize.width >= 1.5) {
-    cv.rotate(dst_img, dst_img, cv.ROTATE_90_CLOCKWISE);
-  }
-  srcTri.delete();
-  dstTri.delete();
-  M.delete();
-  return dst_img;
-}
-
-export function get_minarea_rect_crop(img: Mat, arg_points: Box, cv: CV2): Mat {
-  const srcTri = boxToMat(arg_points, cv);
-  const bounding_box = cv.minAreaRect(srcTri);
-  const matPoints: Mat = new cv.Mat();
-  cv.boxPoints(bounding_box, matPoints);
-  const beforePoints: Point[] = matToPoints(matPoints, cv);
-  if (beforePoints.length !== 4) {
-    throw new Error("shape of points must be 4*2");
-  }
-  const points = beforePoints.sort((a, b) => a[0] - b[0]) as Box;
-
-  let index_a = 0,
-    index_b = 1,
-    index_c = 2,
-    index_d = 3;
-
-  if (points[1][1] > points[0][1]) {
-    index_a = 0;
-    index_d = 1;
-  } else {
-    index_a = 1;
-    index_d = 0;
-  }
-
-  if (points[3][1] > points[2][1]) {
-    index_b = 2;
-    index_c = 3;
-  } else {
-    index_b = 3;
-    index_c = 2;
-  }
-
-  const sortedBox: Box = [
-    points[index_a]!,
-    points[index_b]!,
-    points[index_c]!,
-    points[index_d]!,
-  ];
-
-  const crop_img = get_rotate_crop_image(img, sortedBox, cv);
-  srcTri.delete();
-  matPoints.delete();
-  return crop_img;
-}
-
 export function matToNdArray(mat: Mat, cv: CV2, skip_channel = false): NdArray {
   const buffer = matToArrayBuffer(mat, cv);
   if (
@@ -290,7 +198,7 @@ export function matToNdArray(mat: Mat, cv: CV2, skip_channel = false): NdArray {
 
 export function broadcastTo<T extends ndarray.Data>(
   arr: NdArray<T>,
-  targetShape: number[]
+  targetShape: number[],
 ): NdArray<T> {
   const inShape = arr.shape;
   const inStrides = arr.stride.slice();
@@ -321,17 +229,17 @@ export function broadcastTo<T extends ndarray.Data>(
 export function fillValue<T extends ndarray.Data>(
   arr: NdArray<T>,
   targetShape: number[],
-  value = 0
+  value = 0,
 ) {
   if (arr.shape.length !== targetShape.length) {
     throw new Error(
-      `fillZero: shape length mismatch\n  expected: ${targetShape.length}\n  actual: ${arr.shape.length}`
+      `fillZero: shape length mismatch\n  expected: ${targetShape.length}\n  actual: ${arr.shape.length}`,
     );
   }
   for (let i = 0; i < targetShape.length; i++) {
     if (arr.shape[i]! > targetShape[i]!) {
       throw new Error(
-        `fillZero: shape mismatch at dimension ${i}\n  expected: <= ${targetShape[i]}\n  actual: ${arr.shape[i]}`
+        `fillZero: shape mismatch at dimension ${i}\n  expected: <= ${targetShape[i]}\n  actual: ${arr.shape[i]}`,
       );
     }
   }
@@ -356,7 +264,7 @@ export function fillValue<T extends ndarray.Data>(
   const slices = arr.shape.map((dim) => [0, dim] as [number, number]);
   ops.assign(
     newArr.hi(...slices.map((s) => s[1])).lo(...slices.map((s) => s[0])),
-    arr
+    arr,
   );
 
   return newArr;
@@ -402,7 +310,7 @@ export function clip(
   dest: NdArray<ndarray.TypedArray | ndarray.GenericArray<number> | number[]>,
   src: NdArray<ndarray.TypedArray | ndarray.GenericArray<number> | number[]>,
   min: number,
-  max: number
+  max: number,
 ): void {
   if (min > max) {
     throw new Error(`min (${min}) must be <= max (${max})`);
@@ -414,12 +322,12 @@ export function clip(
 }
 
 export function cloneNdArray<T extends ndarray.Data>(
-  src: NdArray<T>
+  src: NdArray<T>,
 ): NdArray<T> {
   let newData: T;
   if (Array.isArray(src.data)) {
     newData = src.data.map((item) =>
-      Array.isArray(item) ? [...item] : item
+      Array.isArray(item) ? [...item] : item,
     ) as T;
   } else {
     newData = new (src.data.constructor as any)(src.data);
@@ -430,7 +338,7 @@ export function cloneNdArray<T extends ndarray.Data>(
 export type NdArrayListData = number[] | NdArrayListData[];
 
 export function ndArrayToList<T extends ndarray.Data>(
-  arr: NdArray<T>
+  arr: NdArray<T>,
 ): NdArrayListData {
   // 0次元配列の場合は1要素の配列として扱う
   if (arr.shape.length === 0) {
@@ -460,11 +368,11 @@ let _clipper = null as clipperLib.ClipperLibWrapper | null;
 
 export async function unclip(
   box: { x: number; y: number }[],
-  unclipRatio: number
+  unclipRatio: number,
 ): Promise<clipperLib.Paths> {
   if (_clipper === null) {
     _clipper = await clipperLib.loadNativeClipperLibInstanceAsync(
-      clipperLib.NativeClipperLibRequestedFormat.WasmWithAsmJsFallback
+      clipperLib.NativeClipperLibRequestedFormat.WasmWithAsmJsFallback,
     );
   }
   const clipper = _clipper;
@@ -661,7 +569,7 @@ export function tensorToNdArray(tensor: ORTTensorType): NdArray {
   const shape = [...tensor.dims];
   if (Array.isArray(data) || data instanceof BigUint64Array) {
     throw new Error(
-      "tensorToNdArray: tensor.data is an array, expected TypedArray"
+      "tensorToNdArray: tensor.data is an array, expected TypedArray",
     );
   }
   return ndarray(data as ndarray.TypedArray, shape);
@@ -676,7 +584,7 @@ export function argsort(arr: number[]): number[] {
 
 export function zeroNdArray(
   constructorOrIsArray: Function | boolean,
-  shape: number[]
+  shape: number[],
 ) {
   const mul_shape = shape.reduce((a, b) => a * b, 1);
   let newData: ndarray.TypedArray | number[];

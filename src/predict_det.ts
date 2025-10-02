@@ -44,7 +44,7 @@ let _use_cpu_det_onnx_session: ORTSessionReturnType | undefined = undefined;
 let _use_cpu_session_hash: string | undefined = undefined;
 
 export type TextDetectorParams = {
-  drop_score?: number;
+  drop_score: number | null;
   limit_side_len: number;
   det_limit_type: "max" | "min" | "resize_long" | null;
   det_db_thresh: DET_DB_THRESH;
@@ -70,10 +70,9 @@ export class TextDetector extends PredictBase {
   det_box_type: DET_BOX_TYPE;
 
   constructor(
-    params:
-      | TextDetectorParams & {
-          det_onnx_session: ORTSessionReturnType;
-        }
+    params: TextDetectorParams & {
+      det_onnx_session: ORTSessionReturnType;
+    },
   ) {
     super();
     this.cv = params.cv;
@@ -134,7 +133,7 @@ export class TextDetector extends PredictBase {
     const det_onnx_session = await TextDetector.get_onnx_session(
       params.det_model_array_buffer,
       params.use_gpu,
-      params.ort
+      params.ort,
     );
     return new TextDetector({ ...params, det_onnx_session });
   }
@@ -157,7 +156,7 @@ export class TextDetector extends PredictBase {
 
     const tmp = pts.filter((_, i) => i !== minIndex && i !== maxIndex);
 
-    const diff = tmp.map((p) => p[0] - p[1]);
+    const diff = tmp.map((p) => p[1] - p[0]); // ← ここを変更
     const minDiffIndex = diff.indexOf(Math.min(...diff)); // top-right
     const maxDiffIndex = diff.indexOf(Math.max(...diff)); // bottom-left
 
@@ -170,8 +169,8 @@ export class TextDetector extends PredictBase {
   clip_det_res(points: Point[], img_height: number, img_width: number) {
     let new_points = [...points];
     for (let p of new_points) {
-      p[0] = Math.trunc(Math.min(Math.max(p[0], 0), img_width - 1));
-      p[1] = Math.trunc(Math.min(Math.max(p[1], 0), img_height - 1));
+      p[0] = Math.round(Math.min(Math.max(p[0], 0), img_width - 1));
+      p[1] = Math.round(Math.min(Math.max(p[1], 0), img_height - 1));
     }
     return new_points;
   }
@@ -182,15 +181,17 @@ export class TextDetector extends PredictBase {
     for (const box of dt_boxes) {
       let box_new = this.order_points_clockwise(box);
       box_new = this.clip_det_res(box_new, img_height!, img_width!);
-      const rect_width = Math.trunc(
-        euclideanDistance(box_new[0]!, box_new[1]!)
+      const rect_width = Math.round(
+        euclideanDistance(box_new[0]!, box_new[1]!),
       );
-      const rect_height = Math.trunc(
-        euclideanDistance(box_new[0]!, box_new[3]!)
+      const rect_height = Math.round(
+        euclideanDistance(box_new[0]!, box_new[3]!),
       );
-      if (rect_width <= 3 || rect_height <= 3) {
-        continue;
-      }
+      if (rect_width <= 3 || rect_height <= 3) continue;
+
+      // order_points_clockwiseは [top-left, top-right, bottom-right, bottom-left] を返す
+      // しかし期待値は [top-left, bottom-left, bottom-right, top-right] の順序
+      // これは実際にはPython版のget_mini_boxesと同じ順序
       db_boxes_new.push(box_new);
     }
     return db_boxes_new;
@@ -212,48 +213,35 @@ export class TextDetector extends PredictBase {
     const transformed = transform(data, this.preprocess_op) as
       | DataValues[]
       | null;
-    if (transformed === null || transformed[0] === null) {
-      return null;
-    }
+    if (!transformed || !transformed[0]) return null;
+
     const img = transformed[0]! as NdArrayData["image"];
     const shape_list = transformed[1]! as Data["shape"];
 
     const cloned_img = cloneNdArray(img);
-
     const img_buffer = Float32Array.from(
-      (ndArrayToList(cloned_img) as number[][][]).flat(Infinity)
+      (ndArrayToList(cloned_img) as number[][][]).flat(Infinity),
     );
     const img_shape = [1, ...cloned_img.shape];
+    //console.log("img_shape:", img_shape);
     const tensor_img = new this.ort.Tensor("float32", img_buffer, img_shape);
     const input_feed = this.get_input_feed(this.det_input_name, tensor_img);
 
-    const ort_run_fetches: ORTRunFetchesType = this.det_output_name;
-
     const outputs = await this.det_onnx_session.run(
       input_feed,
-      ort_run_fetches
+      this.det_output_name,
     );
+    const result_preds = outputs[this.det_output_name[0]!];
+    if (!result_preds) throw new Error("No output from the model");
 
-    const result_preds = outputs[ort_run_fetches[0]!];
-
-    if (!result_preds) {
-      throw new Error("No output from the model");
-    }
     const preds: OutDict = { maps: tensorToNdArray(result_preds) };
-
-    console.log("preds:", preds);
-    const post_shape_list = shape_list ? [shape_list] : [];
-
-    console.log("post_shape_list:", post_shape_list);
+    const post_shape_list = [shape_list!]; // Pythonと同じ形に揃える
 
     const post_result = await this.postprocess_op.execute(
       preds,
-      post_shape_list
+      post_shape_list,
     );
-
     const dt_boxes = post_result[0]!["points"];
-
-    console.log("dt_boxes:", dt_boxes);
 
     const dt_boxes_array = (
       Array.isArray(dt_boxes)
@@ -261,17 +249,21 @@ export class TextDetector extends PredictBase {
         : (ndArrayToList(dt_boxes) as number[][][])
     ) as Point[][];
 
-    if (this.det_box_type === "poly") {
-      return this.filter_tag_det_res_only_clip(dt_boxes_array, img.shape);
-    } else {
-      return this.filter_tag_det_res(dt_boxes_array, img.shape);
-    }
+    return this.det_box_type === "poly"
+      ? this.filter_tag_det_res_only_clip(dt_boxes_array, [
+          shape_list![0],
+          shape_list![1],
+        ])
+      : this.filter_tag_det_res(dt_boxes_array, [
+          shape_list![0],
+          shape_list![1],
+        ]);
   }
 
   static async get_onnx_session(
     modelArrayBuffer: ORTBufferType,
     use_gpu: USE_GCU,
-    ort: ORT
+    ort: ORT,
   ): Promise<ORTSessionReturnType> {
     const modelHash = this.get_model_hash(modelArrayBuffer);
 
@@ -282,7 +274,7 @@ export class TextDetector extends PredictBase {
       _use_gpu_det_onnx_session = await create_onnx_session_fn(
         ort,
         modelArrayBuffer,
-        use_gpu
+        use_gpu,
       );
       _use_gpu_session_hash = modelHash;
       return _use_gpu_det_onnx_session;
@@ -293,7 +285,7 @@ export class TextDetector extends PredictBase {
       _use_cpu_det_onnx_session = await create_onnx_session_fn(
         ort,
         modelArrayBuffer,
-        use_gpu
+        use_gpu,
       );
       _use_cpu_session_hash = modelHash;
       return _use_cpu_det_onnx_session;

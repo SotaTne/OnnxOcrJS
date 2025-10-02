@@ -62,7 +62,7 @@ export class TextClassifier extends PredictBase {
   constructor(
     params: TextClassifierParams & {
       cls_onnx_session: ORTSessionReturnType;
-    }
+    },
   ) {
     super();
     this.cv = params.cv;
@@ -84,7 +84,7 @@ export class TextClassifier extends PredictBase {
     const cls_onnx_session = await TextClassifier.get_onnx_session(
       params.cls_model_array_buffer,
       params.use_gpu,
-      params.ort
+      params.ort,
     );
     return new TextClassifier({ ...params, cls_onnx_session });
   }
@@ -93,51 +93,47 @@ export class TextClassifier extends PredictBase {
     const imgC = this.cls_image_shape[0]!;
     const imgH = this.cls_image_shape[1]!;
     const imgW = this.cls_image_shape[2]!;
+
     const h = img.rows;
     const w = img.cols;
     const ratio = w / h;
-    let resized_w = Math.ceil(imgW * ratio);
+
+    let resized_w = Math.ceil(imgH * ratio);
     if (resized_w > imgW) {
       resized_w = imgW;
     }
+
     const resized_image = new this.cv.Mat();
     this.cv.resize(img, resized_image, new this.cv.Size(resized_w, imgH));
-    const ndarray_img = matToNdArray(resized_image, this.cv);
-    let resized_ndarray_image: NdArray;
-    if (this.cls_image_shape[0] === 1) {
-      const img_3c_list = (
-        ndArrayToList(cloneNdArray(ndarray_img)) as number[][][]
-      ).map((row) => row.map((col) => [col[0]!, col[0]!, col[0]!]));
-      const listData = img_3c_list.flat(2).map((v) => (v / 255 - 0.5) / 0.5);
-      const ndarray_img_3c = ndarray(Float32Array.from(listData), [
-        ndarray_img.shape[0]!,
-        ndarray_img.shape[1]!,
-        3,
-      ]); // (H,W,3)
-      resized_ndarray_image = ndarray_img_3c.transpose(2, 0, 1); // (3,H,W)
-    } else {
-      const listData = (
-        ndArrayToList(cloneNdArray(ndarray_img)) as number[][][]
-      )
-        .flat(2)
-        .map((v) => (v / 255 - 0.5) / 0.5);
-      const ndarray_img_3c = ndarray(Float32Array.from(listData), [
-        ndarray_img.shape[0]!,
-        ndarray_img.shape[1]!,
-        3,
-      ]);
-      resized_ndarray_image = ndarray_img_3c.transpose(2, 0, 1); // (3,H,W)
-    }
-    const zeroImg = ndarray(
-      Float32Array.from(Array(imgC * imgH * resized_w).fill(0)),
-      [imgC, imgH, imgW]
-    );
 
+    // → ndarray に変換
+    const ndarray_img = matToNdArray(resized_image, this.cv); // (H,W,3)
+    resized_image.delete();
+
+    // 正規化 ( /255 → -0.5 → /0.5 )
+    const listData = (ndArrayToList(ndarray_img) as number[][][])
+      .flat(2)
+      .map((v) => v / 255.0)
+      .map((v) => (v - 0.5) / 0.5);
+
+    // (H,W,3) → (3,H,W)
+    const ndarray_img_3c = ndarray(Float32Array.from(listData), [
+      ndarray_img.shape[0]!,
+      ndarray_img.shape[1]!,
+      3,
+    ]);
+    const chw = ndarray_img_3c.transpose(2, 0, 1);
+
+    // padding
+    const zeroImg = ndarray(new Float32Array(imgC * imgH * imgW).fill(0), [
+      imgC,
+      imgH,
+      imgW,
+    ]);
     const zeroView = zeroImg.hi(imgC, imgH, resized_w);
+    ops.assign(zeroView, chw.hi(imgC, imgH, resized_w));
 
-    ops.assign(zeroView, resized_ndarray_image.hi(imgC, imgH, resized_w));
-
-    return zeroView;
+    return zeroImg;
   }
 
   async execute(img_list: Mat[]): Promise<[Mat[], [string, number][]]> {
@@ -175,16 +171,16 @@ export class TextClassifier extends PredictBase {
       const tensor_imgs = new this.ort.Tensor(
         "float32",
         img_buffer,
-        images_shape
+        images_shape,
       );
       const input_feed = this.get_input_feed(this.cls_input_name, tensor_imgs);
       const ort_run_fetches: ORTRunFetchesType = this.cls_output_name;
 
       const outputs = await this.cls_onnx_session.run(
         input_feed,
-        ort_run_fetches
+        ort_run_fetches,
       );
-      const result_prod = outputs[0];
+      const result_prod = outputs[this.cls_output_name[0]!];
       if (!result_prod) {
         throw new Error("No output from the ONNX model.");
       }
@@ -195,20 +191,27 @@ export class TextClassifier extends PredictBase {
       const cls_result = this.postprocess_op.execute(
         prodList,
         prodNdArray.shape,
-        null
+        null,
       );
       for (let rno = 0; rno < cls_result.length; rno++) {
         const [label, score] = cls_result[rno]!;
         cls_res[indices[beg_img_no + rno]!] = [label, score];
-        if (label.includes("180") && score > this.cls_thresh) {
+        // console.log("label:", label);
+        // console.log("label is 180", label === "180");
+        // console.log("this.cls_thresh", this.cls_thresh);
+        // console.log("score", score);
+        if (label === "180" && score > this.cls_thresh) {
+          console.log("rotate");
           const dstMat = new this.cv.Mat();
           this.cv.rotate(
             img_list[indices[beg_img_no + rno]!]!,
             dstMat,
-            this.cv.ROTATE_180
+            this.cv.ROTATE_180,
           );
           img_list[indices[beg_img_no + rno]!]?.delete();
           img_list[indices[beg_img_no + rno]!] = dstMat;
+        } else {
+          console.log("not rotate");
         }
       }
     }
@@ -219,7 +222,7 @@ export class TextClassifier extends PredictBase {
   static async get_onnx_session(
     modelArrayBuffer: ORTBufferType,
     use_gpu: USE_GCU,
-    ort: ORT
+    ort: ORT,
   ): Promise<ORTSessionReturnType> {
     const modelHash = this.get_model_hash(modelArrayBuffer);
 
@@ -230,7 +233,7 @@ export class TextClassifier extends PredictBase {
       _use_gpu_cls_onnx_session = await create_onnx_session_fn(
         ort,
         modelArrayBuffer,
-        use_gpu
+        use_gpu,
       );
       _use_gpu_session_hash = modelHash;
       return _use_gpu_cls_onnx_session;
@@ -241,7 +244,7 @@ export class TextClassifier extends PredictBase {
       _use_cpu_cls_onnx_session = await create_onnx_session_fn(
         ort,
         modelArrayBuffer,
-        use_gpu
+        use_gpu,
       );
       _use_cpu_session_hash = modelHash;
       return _use_cpu_cls_onnx_session;

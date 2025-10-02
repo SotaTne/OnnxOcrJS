@@ -1,35 +1,10 @@
 import { expect, describe, it, beforeAll } from "vitest";
 import type cvReadyPromiseType from "@techstark/opencv-js";
 import ndarray, { type NdArray } from "ndarray";
-import {
-  DBPostProcess,
-  type DBPostProcessParams,
-  type OutDict,
-} from "./db_postprocess.js";
+import { DBPostProcess, type DBPostProcessParams } from "./db_postprocess.js";
 import { ndArrayToList } from "./utils/func.js";
 import type { Point } from "./types/type.js";
-
-function toNestedArray(points: Point[][]): number[][][] {
-  return JSON.parse(JSON.stringify(points));
-}
-
-function roughlyEqualFlat(
-  received: Point[][],
-  expected: Point[][],
-  tolerance = 1
-): boolean {
-  const rFlat = toNestedArray(received).flat(2).flat() as number[];
-  const eFlat = toNestedArray(expected).flat(2).flat() as number[];
-
-  if (rFlat.length !== eFlat.length) return false;
-
-  for (let i = 0; i < rFlat.length; i++) {
-    if (Math.abs(rFlat[i]! - eFlat[i]!) > tolerance) {
-      return false;
-    }
-  }
-  return true;
-}
+import outs_dict from "./outs_dict.json" with { type: "json" };
 
 let cv: Awaited<typeof cvReadyPromiseType>;
 
@@ -132,11 +107,11 @@ describe("DBPostProcess (large maps)", () => {
 
     const results = (await new DBPostProcess(params).execute(
       { maps: ndarray(ndarrayData, [1, 1, H, W]) },
-      [[H, W, 1.0, 1.0]]
+      [[H, W, 1.0, 1.0]],
     )) as { points: NdArray }[];
 
     expect(ndArrayToList(results[0]!.points)).toEqual(
-      expectedResults.binary_map_correct
+      expectedResults.binary_map_correct,
     );
   });
 
@@ -164,11 +139,11 @@ describe("DBPostProcess (large maps)", () => {
 
     const results = (await new DBPostProcess(params).execute(
       { maps: ndarray(ndarrayData, [1, 1, H, W]) },
-      [[H, W, 1.0, 1.0]]
+      [[H, W, 1.0, 1.0]],
     )) as { points: NdArray }[];
 
     expect(ndArrayToList(results[0]!.points)).toEqual(
-      expectedResults.binary_map_with_dilation
+      expectedResults.binary_map_with_dilation,
     );
   });
 
@@ -204,7 +179,7 @@ describe("DBPostProcess (large maps)", () => {
 
     const results = (await new DBPostProcess(params).execute(
       { maps: ndarray(ndarrayData, [1, 1, H, W]) },
-      [[H, W, 1.0, 1.0]]
+      [[H, W, 1.0, 1.0]],
     )) as { points: Point[][] }[];
     expect(results[0]!.points).toEqual(expectedResults.poly_box_detect);
   });
@@ -226,7 +201,59 @@ describe("DBPostProcess (large maps)", () => {
     const maps = ndarray(new Float32Array(2 * H * W), [2, 1, H, W]);
 
     await expect(() =>
-      new DBPostProcess(params).execute({ maps }, [[H, W, 1.0, 1.0]])
+      new DBPostProcess(params).execute({ maps }, [[H, W, 1.0, 1.0]]),
     ).rejects.toThrow(/shape_list length mismatch/);
+  });
+
+  it("実際の値での動作確認", async () => {
+    const params: DBPostProcessParams = {
+      name: "DBPostProcess",
+      thresh: 0.3,
+      box_thresh: 0.6,
+      max_candidates: 1000,
+      unclip_ratio: 1.5,
+      use_dilation: false,
+      score_mode: "fast",
+      box_type: "quad",
+      cv,
+    };
+    const shape = [[579, 584, 0.99481865, 0.98630137]];
+    const trueResult = [
+      [
+        [89, 417],
+        [379, 428],
+        [376, 523],
+        [86, 512],
+      ],
+
+      [
+        [21, 229],
+        [559, 229],
+        [559, 341],
+        [21, 341],
+      ],
+
+      [
+        [276, 121],
+        [332, 121],
+        [332, 180],
+        [276, 180],
+      ],
+    ];
+    const mapList = outs_dict as number[][][][];
+    const maps = ndarray(new Float32Array(mapList.flat(3)), [1, 1, 576, 576]);
+
+    const results = (await new DBPostProcess(params).execute(
+      { maps },
+      shape as [number, number, number, number][],
+    )) as { points: NdArray }[];
+
+    const result = ndArrayToList(results[0]!.points) as number[][][];
+
+    console.log(results);
+
+    console.log(trueResult);
+
+    expect(result.flat(Infinity)).toEqual(trueResult.flat(Infinity));
   });
 });

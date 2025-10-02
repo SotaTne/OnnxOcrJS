@@ -13,6 +13,7 @@
     "vitest.*.ts",
     "test", // テストディレクトリを含めたい場合
     "src/**/*.spec.ts",
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    "src/types/**/*.d.ts"
   ]
 }
