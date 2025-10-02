@@ -58,6 +58,7 @@ jobs:
             package.json
             README*.md
             LICENSE
+            pnpm-lock.yaml
 
   publish:
     needs: build
