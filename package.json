@@ -1,21 +1,54 @@
 {
   "name": "onnx-ocr-js",
   "version": "0.0.1",
-  "description": "",
-  "main": "index.js",
+  "description": "ONNX-based OCR system for Node.js and Browser (PaddleOCR compatible)",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc --p tsconfig.json",
-    "test": "vitest"
+    "test": "vitest",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:bundle": "node esbuild.config.mjs",
+    "build": "npm run build:types && npm run build:bundle",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "onnx",
+    "ocr",
+    "paddleocr",
+    "computer-vision",
+    "nodejs",
+    "browser"
+  ],
+  "author": "SotaTne <sota@sotatne.com>",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/SotaTne/OnnxOcrJS",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SotaTne/OnnxOcrJS.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SotaTne/OnnxOcrJS/issues"
+  },
+  "files": [
+    "dist",
+    "models"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./models/*": "./models/*"
+  },
   "packageManager": "pnpm@10.8.1",
   "devDependencies": {
     "@techstark/opencv-js": "4.11.0-release.1",
     "@types/ndarray": "^1.0.14",
     "@types/ndarray-ops": "^1.2.7",
+    "esbuild": "^0.25.10",
     "jimp": "^1.6.0",
     "onnxruntime-node": "^1.23.0",
     "onnxruntime-react-native": "^1.23.0",
@@ -23,9 +56,6 @@
     "prettier": "^3.6.2",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
-  },
-  "exports": {
-    "./models/*": "./models/*"
   },
   "dependencies": {
     "blakejs": "^1.2.1",

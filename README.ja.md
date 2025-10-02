@@ -1,7 +1,6 @@
 # OnnxOcrJS
 
-An ONNX-based OCR library compatible with **PaddleOCR** models.  
-Runs on **Node.js** and **Browser**.
+ONNX ベースの OCR ライブラリです。PaddleOCR 互換のモデルを利用でき、Node.js とブラウザ両方で動作します。
 
 ---
 
@@ -13,13 +12,13 @@ Runs on **Node.js** and **Browser**.
 
 ---
 
-## Installation
+## インストール
 
 ```bash
 npm install onnx-ocr-js
 ```
 
-or
+または
 
 ```bash
 pnpm add onnx-ocr-js
@@ -27,9 +26,9 @@ pnpm add onnx-ocr-js
 
 ---
 
-## Usage
+## 使い方
 
-### Node.js Example
+### Node.js での利用
 
 ```ts
 import { ONNXPaddleOCR } from "onnx-ocr-js";
@@ -43,7 +42,19 @@ const recModel = await fs.readFile("./models/ppocrv5/rec/rec.onnx");
 const clsModel = await fs.readFile("./models/ppocrv5/cls/cls.onnx");
 const charset = await fs.readFile("./models/ppocrv5/ppocrv5_dict.txt", "utf-8");
 
-const ocr = new ONNXPaddleOCR({ use_angle_cls: true });
+const ocr = new ONNXPaddleOCR({
+  limit_side_len: 960,
+  det_db_thresh: 0.3,
+  det_db_box_thresh: 0.6,
+  det_db_unclip_ratio: 1.5,
+  det_db_score_mode: "fast",
+  det_box_type: "quad",
+  cls_image_shape: [3, 48, 192],
+  rec_image_shape: [3, 48, 320],
+  drop_score: 0.5,
+  rec_algorithm: "SVTR_LCNet",
+  use_angle_cls: true,
+});
 
 const textSystem = await ocr.init({
   cv,
@@ -54,7 +65,7 @@ const textSystem = await ocr.init({
   rec_char_dict: charset,
 });
 
-// Convert image with OpenCV.js
+// OpenCV.js で画像を Mat に変換
 import { Jimp } from "jimp";
 const jimpImage = await Jimp.read("./test.png");
 const mat = cv.matFromImageData(jimpImage.bitmap);
@@ -65,7 +76,7 @@ const results = await ocr.ocr(textSystem, mat3ch, true, true, true);
 console.log(results);
 ```
 
-### Browser Example
+### ブラウザでの利用
 
 ```html
 <script type="module">
@@ -110,20 +121,20 @@ console.log(results);
 
 ---
 
-## Notes
+## 注意事項
 
 - **ONNX Runtime**:  
-  Use `onnxruntime-node` for Node.js, `onnxruntime-web` for Browser, and `onnxruntime-react-native` for React Native.  
+  Node.js では `onnxruntime-node`、ブラウザでは `onnxruntime-web`、ReactNative では `onnxruntime-react-native` を利用可能です。
 
 - **OpenCV.js**:  
-  This library **only depends on `@techstark/opencv-js@^4.11.0` for type definitions**.  
-  You can load OpenCV.js in any way you prefer (CDN, npm, or self-host).  
+  本ライブラリは **型情報としてのみ** `@techstark/opencv-js@^4.11.0` に依存しています。  
+  実際の OpenCV.js の読み込み（CDN / npm / self-host など）は利用者が自由に選択してください。
 
-- **Models**:  
-  `.onnx` models must be loaded as `Buffer` (Node.js) or `ArrayBuffer` (Browser).  
+- **モデルファイル**:  
+  `.onnx` モデルは `ArrayBuffer` または `Buffer` として読み込んでください。
 
-- **Licenses**:  
-  - This library: **Apache-2.0**  
-  - Models and algorithms follow their original projects:  
-    - [PaddleOCR (Apache-2.0)](https://github.com/PaddlePaddle/PaddleOCR)  
-    - [ONNXOCR (Apache-2.0)](https://github.com/kyamagu/onnxocr)  
+- **ライセンス**:  
+  本ライブラリのライセンスは **Apache-2.0** です。  
+  ただしアルゴリズムやモデルはそれぞれ以下のライセンスに従います:  
+  - [PaddleOCR (Apache-2.0)](https://github.com/PaddlePaddle/PaddleOCR)  
+  - [ONNXOCR (Apache-2.0)](https://github.com/kyamagu/onnxocr)

@@ -1,7 +1,7 @@
 # OnnxOcrJS
 
-An ONNX-based OCR library compatible with **PaddleOCR** models.  
-Runs on **Node.js** and **Browser**.
+基于 **ONNX** 的 OCR 库，兼容 **PaddleOCR** 模型。  
+可在 **Node.js** 与 **浏览器** 中运行。
 
 ---
 
@@ -13,13 +13,13 @@ Runs on **Node.js** and **Browser**.
 
 ---
 
-## Installation
+## 安装
 
 ```bash
 npm install onnx-ocr-js
 ```
 
-or
+或
 
 ```bash
 pnpm add onnx-ocr-js
@@ -27,9 +27,9 @@ pnpm add onnx-ocr-js
 
 ---
 
-## Usage
+## 使用方法
 
-### Node.js Example
+### Node.js 示例
 
 ```ts
 import { ONNXPaddleOCR } from "onnx-ocr-js";
@@ -54,7 +54,7 @@ const textSystem = await ocr.init({
   rec_char_dict: charset,
 });
 
-// Convert image with OpenCV.js
+// 使用 OpenCV.js 转换图像
 import { Jimp } from "jimp";
 const jimpImage = await Jimp.read("./test.png");
 const mat = cv.matFromImageData(jimpImage.bitmap);
@@ -65,7 +65,7 @@ const results = await ocr.ocr(textSystem, mat3ch, true, true, true);
 console.log(results);
 ```
 
-### Browser Example
+### 浏览器示例
 
 ```html
 <script type="module">
@@ -110,20 +110,20 @@ console.log(results);
 
 ---
 
-## Notes
+## 注意事项
 
 - **ONNX Runtime**:  
-  Use `onnxruntime-node` for Node.js, `onnxruntime-web` for Browser, and `onnxruntime-react-native` for React Native.  
+  Node.js 使用 `onnxruntime-node`，浏览器使用 `onnxruntime-web`，React Native 使用 `onnxruntime-react-native`。  
 
 - **OpenCV.js**:  
-  This library **only depends on `@techstark/opencv-js@^4.11.0` for type definitions**.  
-  You can load OpenCV.js in any way you prefer (CDN, npm, or self-host).  
+  本库仅依赖 `@techstark/opencv-js@^4.11.0` 的 **类型定义**。  
+  OpenCV.js 的实际加载方式（CDN / npm / 本地部署）由用户自行决定。  
 
-- **Models**:  
-  `.onnx` models must be loaded as `Buffer` (Node.js) or `ArrayBuffer` (Browser).  
+- **模型文件**:  
+  `.onnx` 模型需以 `Buffer` (Node.js) 或 `ArrayBuffer` (浏览器) 加载。  
 
-- **Licenses**:  
-  - This library: **Apache-2.0**  
-  - Models and algorithms follow their original projects:  
+- **许可证**:  
+  - 本库: **Apache-2.0**  
+  - 模型与算法遵循原项目的许可证:  
     - [PaddleOCR (Apache-2.0)](https://github.com/PaddlePaddle/PaddleOCR)  
     - [ONNXOCR (Apache-2.0)](https://github.com/kyamagu/onnxocr)  

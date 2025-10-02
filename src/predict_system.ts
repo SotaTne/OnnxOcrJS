@@ -17,7 +17,7 @@ export type TextSystemParams = {
   cv: CV2;
 } & TextDetectorParams &
   TextRecognizerParams &
-  TextClassifierParams;
+  (TextClassifierParams | undefined);
 
 export class TextSystem {
   text_detector: TextDetector;

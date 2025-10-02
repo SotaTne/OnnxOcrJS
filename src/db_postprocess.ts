@@ -82,13 +82,13 @@ export class DBPostProcess {
 
   async execute(
     outs_dict: OutDict,
-    shape_list: [number, number, number, number][]
+    shape_list: [number, number, number, number][],
   ) {
     const pred = outs_dict.maps;
     const pickedPred = pred.pick(-1, 0, -1, -1); // X*Y*Z*(1) [[[]]]
     const segmentationPred = ndarray(
       new Float32Array(pickedPred.size),
-      pickedPred.shape
+      pickedPred.shape,
     );
     // console.log("pickedPred:", pickedPred);
     ops.gts(segmentationPred, pickedPred, this.thresh);
@@ -104,7 +104,7 @@ export class DBPostProcess {
     }
 
     const li = (ndArrayToList(segmentationPred) as number[][][]).flat(
-      Infinity
+      Infinity,
     ) as number[];
     // console.log("bigger");
     for (let i = 0; i < li.length; i++) {
@@ -126,7 +126,9 @@ export class DBPostProcess {
         currentSegment.shape[0]!,
         currentSegment.shape[1]!,
         this.cv.CV_8UC1,
-        (ndArrayToList(currentSegment) as number[][]).flat(Infinity) as number[]
+        (ndArrayToList(currentSegment) as number[][]).flat(
+          Infinity,
+        ) as number[],
       );
       // console.log("matSegment:", matSegment);
       const maskSegment = new this.cv.Mat();
@@ -135,7 +137,7 @@ export class DBPostProcess {
           this.dilation_kernel.shape[0]!,
           this.dilation_kernel.shape[1]!,
           this.cv.CV_8UC1,
-          this.dilation_kernel.data
+          this.dilation_kernel.data,
         );
         this.cv.dilate(matSegment, maskSegment, kernel);
       } else {
@@ -148,14 +150,14 @@ export class DBPostProcess {
           currentSegment,
           maskSegment,
           src_w,
-          src_h
+          src_h,
         );
       } else if (this.box_type === "quad") {
         [boxes, score] = await this.boxes_from_bitmap(
           currentSegment,
           maskSegment,
           src_w,
-          src_h
+          src_h,
         );
       } else {
         throw new Error(`Unknown box_type: ${this.box_type}`);
@@ -171,7 +173,7 @@ export class DBPostProcess {
     pred: NdArray,
     _bitmap: Mat,
     dest_width: number,
-    dest_height: number
+    dest_height: number,
   ): Promise<[Point[][], number[]]> {
     const bitmap = _bitmap;
     const height = bitmap.rows;
@@ -185,7 +187,7 @@ export class DBPostProcess {
       result.row,
       result.col,
       this.cv.CV_8UC1,
-      bitmapData
+      bitmapData,
     );
     const contours = new this.cv.MatVector();
     const _hierarchy = new this.cv.Mat();
@@ -195,7 +197,7 @@ export class DBPostProcess {
       contours,
       _hierarchy,
       this.cv.RETR_LIST,
-      this.cv.CHAIN_APPROX_SIMPLE
+      this.cv.CHAIN_APPROX_SIMPLE,
     );
     for (let i = 0; i < Math.min(contours.size(), this.max_candidates); i++) {
       const contour = contours.get(i);
@@ -214,7 +216,7 @@ export class DBPostProcess {
       const flattedList = pointsList.flat(Infinity) as number[];
       const score: number = this.box_score_fast(
         pred,
-        ndarray(flattedList, [flattedList.length / 2, 2])
+        ndarray(flattedList, [flattedList.length / 2, 2]),
       );
       if (this.box_thresh > score) {
         continue;
@@ -235,7 +237,7 @@ export class DBPostProcess {
         const unclipedBox = await this.ndArrayUnclip(
           pointsNdArray,
           this.unclip_ratio,
-          true
+          true,
         ); // (M,2) or null
         if (unclipedBox === null) {
           continue;
@@ -266,7 +268,7 @@ export class DBPostProcess {
           return result;
         },
         -1,
-        0
+        0,
       );
       const ndArrayBoxUpdated = pickAndSet(
         ndArrayBoxUpdated01,
@@ -282,7 +284,7 @@ export class DBPostProcess {
           return result;
         },
         -1,
-        1
+        1,
       );
       boxes.push(ndArrayToList(ndArrayBoxUpdated) as Point[]);
       scores.push(score);
@@ -299,7 +301,7 @@ export class DBPostProcess {
     pred: NdArray,
     _bitmap: Mat,
     dest_width: number,
-    dest_height: number
+    dest_height: number,
   ): Promise<[NdArray, number[]]> {
     const bitmap = _bitmap;
     const height = bitmap.rows;
@@ -312,7 +314,7 @@ export class DBPostProcess {
       result.row,
       result.col,
       this.cv.CV_8UC1,
-      bitmapData
+      bitmapData,
     );
 
     // 輪郭検出
@@ -323,7 +325,7 @@ export class DBPostProcess {
       contours,
       _hierarchy,
       this.cv.RETR_LIST,
-      this.cv.CHAIN_APPROX_SIMPLE
+      this.cv.CHAIN_APPROX_SIMPLE,
     );
 
     const num_contours = Math.min(contours.size(), this.max_candidates);
@@ -363,7 +365,7 @@ export class DBPostProcess {
       // unclip処理
       const unclippedBox = await this.ndArrayUnclip(
         pointsArray,
-        this.unclip_ratio
+        this.unclip_ratio,
       );
 
       if (unclippedBox === null) {
@@ -404,7 +406,7 @@ export class DBPostProcess {
           return result;
         },
         -1,
-        0
+        0,
       );
 
       // y座標のスケーリング
@@ -419,13 +421,13 @@ export class DBPostProcess {
           return result;
         },
         -1,
-        1
+        1,
       );
 
       // int32に変換
       const intLine = (
         (ndArrayToList(ndArrayBoxUpdated) as number[][]).flat(
-          Infinity
+          Infinity,
         ) as number[]
       ).map((v) => Math.trunc(v));
       const intBox = ndarray(Int32Array.from(intLine), ndArrayBoxUpdated.shape);
@@ -465,11 +467,11 @@ export class DBPostProcess {
   async ndArrayUnclip(
     box: NdArray,
     unclip_ratio: number,
-    onlyOneBox = false
+    onlyOneBox = false,
   ): Promise<NdArray | null> {
     const boxList: [number, number][] = ndArrayToList(box) as [
       number,
-      number
+      number,
     ][];
     if (boxList.length === 0) {
       return null;
@@ -488,7 +490,7 @@ export class DBPostProcess {
     const resultList = result.map((p) =>
       p.map((v) => {
         return [v.x, v.y];
-      })
+      }),
     );
     const flatted = resultList.flat(Infinity) as number[];
     const ndArrayResult = ndarray(Float32Array.from(flatted), [
@@ -504,37 +506,37 @@ export class DBPostProcess {
       Int32Array.from(boxData.flat(Infinity) as number[]),
       _box.shape,
       _box.stride,
-      _box.offset
+      _box.offset,
     );
     const height = bitmap.shape[0]!;
     const width = bitmap.shape[1]!;
     const flooredN0 = Math.trunc(
       Math.min(
         ...((ndArrayToList(box.pick(-1, 0)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
     const ceiledN0 = Math.ceil(
       Math.max(
         ...((ndArrayToList(box.pick(-1, 0)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
     const flooredN1 = Math.trunc(
       Math.min(
         ...((ndArrayToList(box.pick(-1, 1)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
     const ceiledN1 = Math.ceil(
       Math.max(
         ...((ndArrayToList(box.pick(-1, 1)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
 
     const xmin = Math.min(Math.max(flooredN0, 0), width - 1);
@@ -550,7 +552,7 @@ export class DBPostProcess {
         return view;
       },
       -1,
-      0
+      0,
     );
     const pickedN1 = pickAndSet(
       pickedN0,
@@ -560,14 +562,14 @@ export class DBPostProcess {
         return view;
       },
       -1,
-      1
+      1,
     );
 
     const maskCV = this.cv.matFromArray(
       ymax - ymin + 1,
       xmax - xmin + 1,
       this.cv.CV_8UC1,
-      Uint8Array.from(Array((ymax - ymin + 1) * (xmax - xmin + 1)).fill(0))
+      Uint8Array.from(Array((ymax - ymin + 1) * (xmax - xmin + 1)).fill(0)),
     );
 
     const boxCV = ndArrayToMat(pickedN1, this.cv);
@@ -603,30 +605,30 @@ export class DBPostProcess {
     const flooredN0 = Math.trunc(
       Math.min(
         ...((ndArrayToList(reshapedCounter.pick(-1, 0)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
     const ceiledN0 = Math.ceil(
       Math.max(
         ...((ndArrayToList(reshapedCounter.pick(-1, 0)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
     const flooredN1 = Math.trunc(
       Math.min(
         ...((ndArrayToList(reshapedCounter.pick(-1, 1)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
     const ceiledN1 = Math.ceil(
       Math.max(
         ...((ndArrayToList(reshapedCounter.pick(-1, 1)) as number[][]).flat(
-          Infinity
-        ) as number[])
-      )
+          Infinity,
+        ) as number[]),
+      ),
     );
 
     const xmin = Math.min(Math.max(flooredN0, 0), width - 1);
@@ -638,7 +640,7 @@ export class DBPostProcess {
       ymax - ymin + 1,
       xmax - xmin + 1,
       this.cv.CV_8UC1,
-      Uint8Array.from(Array((ymax - ymin + 1) * (xmax - xmin + 1)).fill(0))
+      Uint8Array.from(Array((ymax - ymin + 1) * (xmax - xmin + 1)).fill(0)),
     );
 
     const pikedN10 = pickAndSet(
@@ -649,7 +651,7 @@ export class DBPostProcess {
         return view;
       },
       -1,
-      0
+      0,
     );
     const pikedN1 = pickAndSet(
       pikedN10,
@@ -659,14 +661,14 @@ export class DBPostProcess {
         return view;
       },
       -1,
-      1
+      1,
     );
     const pickedArray = (ndArrayToList(pikedN1) as number[][]).flat();
     const counterCV = this.cv.matFromArray(
       pikedN1.shape[0]!,
       1,
       this.cv.CV_32SC2,
-      Int32Array.from(pickedArray as number[])
+      Int32Array.from(pickedArray as number[]),
     ); //(-1,1,2)
     const vectorBoxCV = new this.cv.MatVector();
     vectorBoxCV.push_back(counterCV);
@@ -719,7 +721,7 @@ export class DBPostProcess {
     ];
     const returnMin = Math.min(
       bounding_box.size.height,
-      bounding_box.size.width
+      bounding_box.size.width,
     );
     return [sortedBox, returnMin];
   }

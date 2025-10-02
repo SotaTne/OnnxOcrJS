@@ -4,7 +4,6 @@
   },
   "files.watcherExclude": {
     "**/node_modules/**": true,
-    "**/dist/**": true,
     "**/.git/**": true
   },
   "editor.formatOnSave": true
