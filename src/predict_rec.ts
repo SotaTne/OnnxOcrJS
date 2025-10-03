@@ -272,18 +272,23 @@ export class TextRecognizer extends PredictBase {
     for (let beg_img_no = 0; beg_img_no < img_num; beg_img_no += batch_num) {
       const end_img_no = Math.min(beg_img_no + batch_num, img_num);
       const norm_img_batch: number[][][][] = [];
-      const [imgC, imgH, imgW] = [
-        this.rec_image_shape[0]!,
-        this.rec_image_shape[1]!,
-        this.rec_image_shape[2]!,
-      ];
+      const imgC = this.rec_image_shape[0]!;
+      const imgH = this.rec_image_shape[1]!;
+      let imgW = this.rec_image_shape[2]!; // ← let に変更
       let max_wh_ratio = imgW / imgH;
+
+      // 最大アスペクト比を計算
       for (let ino = beg_img_no; ino < end_img_no; ino++) {
         const h = img_list[indices[ino]!]?.rows!;
         const w = img_list[indices[ino]!]?.cols!;
-        let wh_ratio = w / h;
+        const wh_ratio = w / h;
         max_wh_ratio = Math.max(max_wh_ratio, wh_ratio);
       }
+
+      // imgW を実際の最大幅に再計算
+      imgW = Math.trunc(imgH * max_wh_ratio);
+
+      // 画像を正規化してバッチに追加
       for (let ino = beg_img_no; ino < end_img_no; ino++) {
         const norm_img = this.resize_norm_img(
           img_list[indices[ino]!]!,
@@ -291,8 +296,18 @@ export class TextRecognizer extends PredictBase {
         );
         norm_img_batch.push(norm_img);
       }
+
+      // 正しい imgW を使用してテンソルを作成
       const images_shape = [norm_img_batch.length, imgC, imgH, imgW];
-      const img_buffer = Float32Array.from([...norm_img_batch].flat(Infinity));
+      const img_buffer = Float32Array.from(
+        [
+          ...[
+            norm_img_batch.map((a) => [
+              ...a.map((b) => [...b.map((c) => [...c])]),
+            ]),
+          ],
+        ].flat(Infinity),
+      );
       const tensor_imgs = new this.ort.Tensor(
         "float32",
         img_buffer,
@@ -314,9 +329,7 @@ export class TextRecognizer extends PredictBase {
       }
 
       const predsNdArray = tensorToNdArray(result_preds);
-
       const predsList = ndArrayToList(predsNdArray) as number[][][];
-
       const rec_result = this.postprocess_op.execute(predsList, null);
 
       for (let rno = 0; rno < rec_result.length; rno++) {

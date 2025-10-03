@@ -167,7 +167,7 @@ export class TextDetector extends PredictBase {
   }
 
   clip_det_res(points: Point[], img_height: number, img_width: number) {
-    let new_points = [...points];
+    let new_points = [...points.map((p) => [...p])] as Point[];
     for (let p of new_points) {
       p[0] = Math.round(Math.min(Math.max(p[0], 0), img_width - 1));
       p[1] = Math.round(Math.min(Math.max(p[1], 0), img_height - 1));

@@ -14,7 +14,7 @@ export function sortedBoxes(dt_boxes: Point[][]): Point[][] {
     return a[0]![1] - b[0]![1]; // y でソート
   });
 
-  const boxes = [...sorted];
+  const boxes = [...sorted.map((b) => [...b])] as Point[][];
 
   for (let i = 0; i < numBoxes - 1; i++) {
     for (let j = i; j >= 0; j--) {
@@ -128,7 +128,9 @@ export function get_minarea_rect_crop(
   const beforePoints: Point[] = boxPoints.map((p) => [p.x, p.y]);
 
   // Python: sorted(..., key=lambda x: x[0])
-  const points = [...beforePoints].sort((a, b) => a[0] - b[0]);
+  const points = ([...beforePoints.map((p) => [...p])] as Point[]).sort(
+    (a, b) => a[0] - b[0],
+  );
 
   let index_a = 0,
     index_b = 1,
