@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Test</title>
+</head>
+<body>
+  <pre id="result">Loading...</pre>
+
+  <!-- OpenCV.js -->
+  <script src="https://docs.opencv.org/4.11.0/opencv.js"></script>
+  <!-- ONNX Runtime Web -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+  <script type="module">
+    import { ONNXPaddleOCR } from "../dist/index.mjs";
+
+    const result = document.getElementById("result");
+
+    let textSystem = null;
+    let ocr = null;
+    let cv2 = null;
+
+    // ---------------------------
+    // 初期化（モデル読み込み + OCR 準備）
+    // ---------------------------
+    async function initOCR(cvInstance) {
+      result.textContent = "Loading models...";
+      try {
+        const [detModel, recModel, clsModel, charset] = await Promise.all([
+          fetch("/models/ppocrv5/det/det.onnx").then(r => {
+            if (!r.ok) throw new Error("Failed det.onnx");
+            return r.arrayBuffer();
+          }).then(b => new Uint8Array(b)),
+
+          fetch("/models/ppocrv5/rec/rec.onnx").then(r => {
+            if (!r.ok) throw new Error("Failed rec.onnx");
+            return r.arrayBuffer();
+          }).then(b => new Uint8Array(b)),
+
+          fetch("/models/ppocrv5/cls/cls.onnx").then(r => {
+            if (!r.ok) throw new Error("Failed cls.onnx");
+            return r.arrayBuffer();
+          }).then(b => new Uint8Array(b)),
+
+          fetch("/models/ppocrv5/ppocrv5_dict.txt").then(r => {
+            if (!r.ok) throw new Error("Failed dict.txt");
+            return r.text();
+          }),
+        ]);
+
+        ocr = new ONNXPaddleOCR({ use_angle_cls: true });
+        textSystem = await ocr.init({
+          cv: cvInstance,
+          ort,
+          det_model_array_buffer: detModel,
+          rec_model_array_buffer: recModel,
+          cls_model_array_buffer: clsModel,
+          rec_char_dict: charset,
+        });
+
+        result.textContent = "✅ OCR Ready";
+      } catch (e) {
+        result.textContent = "Error during init: " + e.message;
+        console.error(e);
+      }
+    }
+
+    // ---------------------------
+    // 推論実行（画像を読み込んで OCR 実行）
+    // ---------------------------
+    async function runOCR() {
+      if (!ocr || !textSystem) {
+        result.textContent = "❌ OCR not initialized";
+        return;
+      }
+
+      try {
+        result.textContent = "Running OCR...";
+        const img = new Image();
+        img.src = "/e2e/images/enhancedscrollbarsearch.png"; // ← サーバーのルートからの絶対パス
+        img.onload = async () => {
+          const mat = cv2.imread(img);
+          const mat3ch = new cv2.Mat();
+          cv2.cvtColor(mat, mat3ch, cv2.COLOR_RGBA2BGR);
+
+          const results = await ocr.ocr(textSystem, mat3ch, true, true, true);
+          result.textContent = JSON.stringify(results, null, 2);
+
+          mat.delete();
+          mat3ch.delete();
+        };
+      } catch (e) {
+        result.textContent = "Error during OCR: " + e.message;
+        console.error(e);
+      }
+    }
+
+    // ---------------------------
+    // OpenCV 初期化を待つ
+    // ---------------------------
+    let cvPromise;
+    if (cv instanceof Promise) {
+      cvPromise = cv;
+    } else {
+      cvPromise = Promise.resolve(cv);
+    }
+
+    cvPromise.then(async (cvInstance) => {
+      cv2 = cvInstance;
+      await initOCR(cv2);
+      // 初期化が終わったら自動的に実行
+      await runOCR();
+    }).catch((e) => {
+      result.textContent = "Error initializing cv: " + e.message;
+      console.error(e);
+    });
+  </script>
+</body>
+</html>

@@ -30,7 +30,7 @@ test.beforeAll(async () => {
 
 test.afterAll(() => server.close());
 
-test.setTimeout(200000); // OCRが重いのでタイムアウトを長めに設定
+test.setTimeout(2000000); // OCRが重いのでタイムアウトを長めに設定
 
 test("run OCR demo", async ({ page }) => {
   page.on("console", (msg) => {
@@ -40,7 +40,7 @@ test("run OCR demo", async ({ page }) => {
     console.error("BROWSER ERROR:", err);
   });
 
-  await page.goto(`http://localhost:${port}/e2e/ocr_test.html`, {
+  await page.goto(`http://localhost:${port}/e2e/big_ocr_test.html`, {
     waitUntil: "domcontentloaded",
   });
 
