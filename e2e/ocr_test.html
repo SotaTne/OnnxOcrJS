@@ -8,9 +8,9 @@
   <pre id="result">Loading...</pre>
 
   <!-- OpenCV.js -->
-  <script src="https://docs.opencv.org/4.11.0/opencv.js"></script>
+  <script src="/e2e/vendor/opencv.js"></script>
   <!-- ONNX Runtime Web -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script src="/node_modules/onnxruntime-web/dist/ort.min.js"></script>
 
   <script type="module">
     import { ONNXPaddleOCR } from "../dist/index.mjs";
@@ -100,7 +100,9 @@
     // OpenCV 初期化を待つ
     // ---------------------------
     let cvPromise;
-    if (cv instanceof Promise) {
+    if (!("cv" in globalThis)) {
+      cvPromise = Promise.reject(new Error("OpenCV.js did not expose global cv"));
+    } else if (cv instanceof Promise) {
       cvPromise = cv;
     } else {
       cvPromise = Promise.resolve(cv);
